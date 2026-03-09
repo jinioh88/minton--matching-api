@@ -1,0 +1,25 @@
+spring:
+  application:
+    name: minton-match-api
+
+  datasource:
+    url: jdbc:mysql://cuddle-db.ctssuui2kqsn.ap-northeast-2.rds.amazonaws.com:3306/minton_match?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Seoul
+    username: admin
+    password: 
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 5
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.MySQLDialect
+    open-in-view: false
+
+server:
+  port: 8080

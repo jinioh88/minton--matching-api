@@ -1,0 +1,39 @@
+---
+description: 배드민턴 매칭 API 기술 스택 - Spring Boot, JPA, MySQL
+alwaysApply: true
+---
+
+# 기술 스택
+
+## 사용 기술
+- **Spring Boot** (4.x)
+- **Spring Data JPA**
+- **MySQL**
+- **Java21**
+
+## 아키텍처
+- Controller → Service → Repository 계층 구조
+- 엔티티는 `@Entity` 기반 JPA 모델
+- REST API 설계
+
+## 계층 의존성 규칙 (Layer Dependency)
+- **표현 계층(Presentation Layer)은 데이터 접근 계층(Data Access Layer)을 직접 사용하지 않는다.**
+- 표현 계층은 비즈니스 로직 계층(Business Logic Layer)만 의존한다.
+- 데이터 접근은 비즈니스 로직 계층에서만 수행한다.
+
+```
+❌ BAD: 표현 계층 → 데이터 접근 계층
+✅ GOOD: 표현 계층 → 비즈니스 로직 계층 → 데이터 접근 계층
+```
+
+## 코딩 규칙
+- 패키지: `org.app.mintonmatchapi` 하위에 도메인별 분리
+- 엔티티: `entity` 또는 `domain` 패키지
+- 서비스: `service` 패키지
+- 리포지토리: `repository` 패키지
+- 컨트롤러: `controller` 패키지
+
+## 데이터베이스
+- MySQL 사용
+- JPA/Hibernate로 ORM
+- `application.properties` 또는 `application.yml`에 DB 연결 설정
