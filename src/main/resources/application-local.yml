@@ -1,15 +1,6 @@
+# 로컬 환경 - H2 데이터베이스
+# OAuth2: 로컬에서는 placeholder 사용. 실제 OAuth 테스트 시 환경변수로 덮어쓰기
 spring:
-  application:
-    name: minton-match-api
-
-  # 프로파일: local(로컬/H2), prod(운영/MySQL)
-  # 기본값 local - 프로파일 미지정 시 로컬 환경 사용
-  profiles:
-    default: local
-
-  # OAuth2 설정 (카카오, 네이버, 구글, 애플)
-  # client-id, client-secret은 각 플랫폼 개발자 콘솔에서 발급
-  # 환경변수로 주입 권장: KAKAO_CLIENT_ID, KAKAO_CLIENT_SECRET 등
   security:
     oauth2:
       client:
@@ -19,7 +10,7 @@ spring:
             client-secret: ${KAKAO_CLIENT_SECRET:}
             authorization-grant-type: authorization_code
             redirect-uri: http://localhost:3000/oauth/callback
-            scope: profile_nickname, account_email
+            scope: profile_nickname
             client-name: Kakao
           naver:
             client-id: ${NAVER_CLIENT_ID:}
@@ -64,21 +55,25 @@ spring:
             # Apple은 user-info API 없음. ID Token JWT에서 claims 추출 (OAuth2Service에서 별도 처리)
             user-info-uri: https://appleid.apple.com
 
-server:
-  port: 8080
+  datasource:
+    url: jdbc:h2:mem:minton_match;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 2
 
-# JWT 설정
-jwt:
-  # HS256 사용 시 최소 32자 이상 필요. 운영 환경에서는 반드시 환경변수로 설정
-  secret: ${JWT_SECRET:default-secret-key-for-development-only-change-in-production-32chars}
-  expiration-ms: ${JWT_EXPIRATION_MS:86400000}
+  jpa:
+    hibernate:
+      ddl-auto: create
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.H2Dialect
+    open-in-view: false
 
-# OAuth2 Redirect URI 허용 목록
-# Flutter 앱, React 웹 등 클라이언트별 redirect URI를 등록
-# Request의 redirectUri가 이 목록에 있는지 검증 후 토큰 교환 진행
-app:
-  oauth2:
-    allowed-redirect-uris:
-      - com.mintonmatch.app://oauth/callback
-      - http://localhost:3000/oauth/callback
-      - http://127.0.0.1:3000/oauth/callback
+  h2:
+    console:
+      enabled: true
