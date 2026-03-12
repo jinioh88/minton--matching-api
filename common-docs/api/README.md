@@ -7,6 +7,7 @@
 | 스프린트 | 문서 | 설명 |
 |----------|------|------|
 | Sprint 1 | [Sprint1-API.md](./Sprint1-API.md) | OAuth2 소셜 로그인, 프로필 API |
+| Sprint 2 | [Sprint2-API.md](./Sprint2-API.md) | S3 파일 업로드, 프로필 이미지, 매칭 API |
 
 ---
 
@@ -49,6 +50,11 @@
 | GET | /api/users/me | Sprint 1 | 내 프로필 조회 |
 | PATCH | /api/users/me | Sprint 1 | 내 프로필 수정 |
 | GET | /api/users/{userId} | Sprint 1 | 타인 프로필 조회 |
+| POST | /api/files/upload | Sprint 2 | 이미지 파일 업로드 |
+| POST | /api/users/me/profile-image | Sprint 2 | 프로필 이미지 업로드 |
+| POST | /api/matches | Sprint 2 | 매칭 생성 |
+| GET | /api/matches | Sprint 2 | 매칭 목록 조회 |
+| GET | /api/matches/{matchId} | Sprint 2 | 매칭 상세 조회 |
 
 ---
 
@@ -74,4 +80,4 @@
 
 ---
 
-**Sprint 1 API 상세**는 [Sprint1-API.md](./Sprint1-API.md)를 참조하세요.
+**Sprint 1 API 상세**는 [Sprint1-API.md](./Sprint1-API.md), **Sprint 2 API 상세**는 [Sprint2-API.md](./Sprint2-API.md)를 참조하세요.

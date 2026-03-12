@@ -4,6 +4,8 @@ import lombok.Builder;
 import lombok.Getter;
 import org.app.mintonmatchapi.user.entity.User;
 
+import java.time.LocalDateTime;
+
 @Getter
 @Builder
 public class AuthResponse {
@@ -19,6 +21,7 @@ public class AuthResponse {
         private String nickname;
         private String profileImg;
         private boolean profileComplete; // 닉네임, interestLoc1 등 필수 프로필 입력 여부
+        private LocalDateTime joinedAt; // 가입일
 
         public static UserResponse from(User user) {
             boolean profileComplete = user.getNickname() != null && !user.getNickname().isBlank()
@@ -30,6 +33,7 @@ public class AuthResponse {
                     .nickname(user.getNickname())
                     .profileImg(user.getProfileImg())
                     .profileComplete(profileComplete)
+                    .joinedAt(user.getCreatedAt())
                     .build();
         }
     }

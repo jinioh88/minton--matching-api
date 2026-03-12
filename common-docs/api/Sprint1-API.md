@@ -141,11 +141,16 @@ Flutter 앱에서 OAuth 인증 후 받은 authorization code를 전달하여 JWT
       "email": "user@example.com",
       "nickname": "닉네임",
       "profileImg": "https://example.com/profile.jpg",
-      "profileComplete": false
+      "profileComplete": false,
+      "joinedAt": "2025-03-10T12:00:00"
     }
   }
 }
 ```
+
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| user.joinedAt | String (ISO-8601) | 가입일 |
 
 **user.profileComplete**
 
@@ -287,7 +292,7 @@ Flutter 앱에서 OAuth 인증 후 받은 authorization code를 전달하여 JWT
 **유효성 검증**
 
 - `interestLoc1`, `interestLoc2`: 7~10자리 숫자 형식 (행정구역 코드)
-- `profileImg`: Sprint 1 범위에서는 **URL 문자열만** 지원 (파일 업로드 미지원)
+- `profileImg`: URL 문자열 전달 시 그대로 저장. 프로필 이미지 업로드는 [Sprint2-API.md](./Sprint2-API.md) 참조
 
 ---
 
@@ -295,7 +300,7 @@ Flutter 앱에서 OAuth 인증 후 받은 authorization code를 전달하여 JWT
 
 **GET** `/api/users/{userId}`
 
-다른 사용자의 프로필을 조회합니다.
+다른 사용자의 프로필을 조회합니다. (내 프로필 조회와 동일한 응답 구조)
 
 **인증** 불필요
 

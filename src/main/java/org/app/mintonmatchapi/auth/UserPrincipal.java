@@ -12,14 +12,20 @@ import java.util.List;
 public class UserPrincipal implements Authentication {
 
     private final Long userId;
+    private final Role role;
 
     public UserPrincipal(Long userId) {
+        this(userId, Role.USER);
+    }
+
+    public UserPrincipal(Long userId, Role role) {
         this.userId = userId;
+        this.role = role != null ? role : Role.USER;
     }
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        return List.of(new SimpleGrantedAuthority("ROLE_USER"));
+        return List.of(new SimpleGrantedAuthority("ROLE_" + role.name()));
     }
 
     @Override

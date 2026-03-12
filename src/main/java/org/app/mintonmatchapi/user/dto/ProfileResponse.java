@@ -5,6 +5,8 @@ import lombok.Getter;
 import org.app.mintonmatchapi.user.entity.Level;
 import org.app.mintonmatchapi.user.entity.User;
 
+import java.time.LocalDateTime;
+
 @Getter
 @Builder
 public class ProfileResponse {
@@ -19,6 +21,7 @@ public class ProfileResponse {
     private String playStyle;
     private Float ratingScore;
     private Integer penaltyCount;
+    private LocalDateTime joinedAt; // 가입일
 
     /**
      * 내 프로필용 - 모든 필드 노출
@@ -35,6 +38,7 @@ public class ProfileResponse {
                 .playStyle(user.getPlayStyle())
                 .ratingScore(user.getRatingScore())
                 .penaltyCount(user.getPenaltyCount())
+                .joinedAt(user.getCreatedAt())
                 .build();
     }
 
@@ -53,6 +57,7 @@ public class ProfileResponse {
                 .playStyle(user.getPlayStyle())
                 .ratingScore(user.getRatingScore())
                 .penaltyCount(user.getPenaltyCount())
+                .joinedAt(user.getCreatedAt())
                 .build();
     }
 }

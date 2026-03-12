@@ -2,6 +2,8 @@ package org.app.mintonmatchapi.user.service;
 
 import org.app.mintonmatchapi.common.exception.BusinessException;
 import org.app.mintonmatchapi.common.exception.ErrorCode;
+import org.app.mintonmatchapi.file.dto.FileUploadType;
+import org.app.mintonmatchapi.file.service.S3Service;
 import org.app.mintonmatchapi.user.dto.NicknameCheckResponse;
 import org.app.mintonmatchapi.user.dto.ProfileResponse;
 import org.app.mintonmatchapi.user.dto.ProfileUpdateRequest;
@@ -9,14 +11,19 @@ import org.app.mintonmatchapi.user.entity.User;
 import org.app.mintonmatchapi.user.repository.UserRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.IOException;
 
 @Service
 public class UserService {
 
     private final UserRepository userRepository;
+    private final S3Service s3Service;
 
-    public UserService(UserRepository userRepository) {
+    public UserService(UserRepository userRepository, S3Service s3Service) {
         this.userRepository = userRepository;
+        this.s3Service = s3Service;
     }
 
     public NicknameCheckResponse checkNickname(String nickname) {
@@ -49,6 +56,37 @@ public class UserService {
                 request.getRacketInfo(),
                 request.getPlayStyle()
         );
+
+        return ProfileResponse.ofMe(user);
+    }
+
+    @Transactional
+    public ProfileResponse uploadProfileImage(Long userId, MultipartFile image) {
+        if (image == null || image.isEmpty()) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "업로드할 이미지가 없습니다.");
+        }
+
+        User user = findUserById(userId);
+
+        // 기존 프로필 이미지가 본 서비스 S3 버킷 경로인 경우 삭제
+        String existingProfileImg = user.getProfileImg();
+        if (existingProfileImg != null && !existingProfileImg.isBlank()) {
+            s3Service.deleteObjectByUrl(existingProfileImg);
+        }
+
+        // S3 업로드 → URL 획득 → User.profileImg 업데이트
+        try {
+            S3Service.FileUploadResult result = s3Service.uploadImage(
+                    image.getInputStream(),
+                    image.getContentType(),
+                    image.getOriginalFilename(),
+                    FileUploadType.PROFILE,
+                    userId
+            );
+            user.updateProfile(null, result.url(), null, null, null, null, null);
+        } catch (IOException e) {
+            throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "프로필 이미지 업로드 중 오류가 발생했습니다.");
+        }
 
         return ProfileResponse.ofMe(user);
     }
