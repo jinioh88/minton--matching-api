@@ -35,8 +35,6 @@ public class MatchCreateRequest {
     @Size(max = 200, message = "장소명은 200자 이하여야 합니다.")
     private String locationName;
 
-    private String locationAddress;
-
     @NotBlank(message = "행정구역 코드는 필수입니다.")
     @Pattern(regexp = "^[0-9]{7,10}$", message = "행정구역 코드는 7~10자리 숫자 형식이어야 합니다.")
     private String regionCode;

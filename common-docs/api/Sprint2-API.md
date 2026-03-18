@@ -13,7 +13,7 @@
 | POST | /api/users/me/profile-image | **필요** | 프로필 이미지 업로드 (Multipart) |
 | POST | /api/matches | **필요** | 매칭 생성 |
 | GET | /api/matches | 불필요 | 매칭 목록 조회 (필터, 페이징) |
-| GET | /api/matches/{matchId} | 불필요 | 매칭 상세 조회 |
+| GET | /api/matches/{matchId} | 불필요 | 매칭 상세 조회 (로그인 시 myParticipation 등 추가 - Sprint 3) |
 
 ---
 
@@ -122,7 +122,6 @@
 | startTime | LocalTime | O | 시작 시간 (HH:mm) |
 | durationMin | Integer | O | 소요 시간(분, 30~240) |
 | locationName | String | X | 장소명 (최대 200자) |
-| locationAddress | String | X | 장소 주소 |
 | regionCode | String | O | 행정구역 코드 (7~10자리 숫자) |
 | maxPeople | Integer | O | 모집 인원 (2~12) |
 | targetLevels | String | X | 희망 급수 (예: "A,B,C") |
@@ -143,7 +142,6 @@
   "startTime": "14:00",
   "durationMin": 120,
   "locationName": "OO체육관",
-  "locationAddress": "서울시 강남구 ...",
   "regionCode": "1168010100",
   "maxPeople": 4,
   "targetLevels": "B,C",
@@ -166,7 +164,6 @@
     "startTime": "14:00",
     "durationMin": 120,
     "locationName": "OO체육관",
-    "locationAddress": "서울시 강남구 ...",
     "regionCode": "1168010100",
     "maxPeople": 4,
     "targetLevels": "B,C",
@@ -245,9 +242,10 @@
 
 **GET** `/api/matches/{matchId}`
 
-매칭 상세 정보를 조회합니다. **비로그인/로그인 모두 접근 가능.**
+매칭 상세 정보를 조회합니다. **비로그인/로그인 모두 접근 가능.**  
+로그인 시 `myParticipation`, `canApply`, `canCancel`, `hasWaitingOffer` 필드가 추가됩니다. (Sprint 3 확장)
 
-**인증** 불필요
+**인증** 불필요 (선택 시 추가 정보 제공)
 
 **Path Parameters**
 
@@ -269,7 +267,6 @@
     "startTime": "14:00",
     "durationMin": 120,
     "locationName": "OO체육관",
-    "locationAddress": "서울시 강남구 ...",
     "regionCode": "1168010100",
     "maxPeople": 4,
     "currentPeople": 2,
@@ -298,10 +295,23 @@
       }
     ],
     "waitingList": [],
-    "waitingCount": 0
+    "waitingCount": 0,
+    "myParticipation": null,
+    "canApply": true,
+    "canCancel": false,
+    "hasWaitingOffer": false
   }
 }
 ```
+
+**로그인 시 추가 필드** (Sprint 3)
+
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| myParticipation | Object | participationId, status, queueOrder, applyMessage, offerExpiresAt |
+| canApply | Boolean | 참여 신청 가능 여부 |
+| canCancel | Boolean | 취소 가능 여부 |
+| hasWaitingOffer | Boolean | 예약 수락 대기 여부 (RESERVED) |
 
 ---
 
@@ -332,6 +342,8 @@
 | ACCEPTED | 수락됨 (확정) |
 | REJECTED | 거절됨 |
 | WAITING | 대기열 |
+| RESERVED | 참여 기회 부여됨 (15분 내 수락 대기) - Sprint 3 |
+| CANCELLED | 본인 취소 - Sprint 3 |
 
 ### FileUploadType (파일 업로드 용도)
 

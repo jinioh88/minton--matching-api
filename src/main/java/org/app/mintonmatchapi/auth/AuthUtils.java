@@ -25,4 +25,15 @@ public final class AuthUtils {
         }
         return principal.getUserId();
     }
+
+    /**
+     * UserPrincipal에서 userId를 추출합니다.
+     * principal이 null이면 null을 반환합니다. (@IfLogin 선택적 인증용)
+     *
+     * @param principal 인증된 사용자 (null 가능)
+     * @return userId 또는 null
+     */
+    public static Long getUserIdOrNull(UserPrincipal principal) {
+        return principal != null ? principal.getUserId() : null;
+    }
 }

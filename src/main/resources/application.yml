@@ -27,6 +27,11 @@ jwt:
 # Flutter 앱, React 웹 등 클라이언트별 redirect URI를 등록
 # Request의 redirectUri가 이 목록에 있는지 검증 후 토큰 교환 진행
 
+# 대기열 하이브리드 시스템 설정
+queue:
+  offer-timeout-minutes: 15        # 예약 유효 시간 (분)
+  emergency-threshold-hours: 2     # 긴급 선착순 전환 기준 (경기 시작 N시간 미만)
+
 app:
   s3:
     bucket-name: ${AWS_S3_BUCKET:minton-match-uploads}

@@ -10,10 +10,14 @@ import org.app.mintonmatchapi.match.dto.MatchDetailResponse;
 import org.app.mintonmatchapi.match.dto.MatchListResponse;
 import org.app.mintonmatchapi.match.dto.MatchResponse;
 import org.app.mintonmatchapi.match.dto.MatchSearchCondition;
+import org.app.mintonmatchapi.match.dto.ParticipantApplicationResponse;
+import org.app.mintonmatchapi.match.dto.ParticipantApplyRequest;
+import org.app.mintonmatchapi.match.dto.ParticipantApplyResponse;
+import org.app.mintonmatchapi.match.dto.ParticipantDecisionRequest;
+import org.app.mintonmatchapi.match.service.MatchParticipantService;
 import org.app.mintonmatchapi.match.service.MatchService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -28,9 +32,11 @@ import java.util.Optional;
 public class MatchController {
 
     private final MatchService matchService;
+    private final MatchParticipantService matchParticipantService;
 
-    public MatchController(MatchService matchService) {
+    public MatchController(MatchService matchService, MatchParticipantService matchParticipantService) {
         this.matchService = matchService;
+        this.matchParticipantService = matchParticipantService;
     }
 
     @PostMapping
@@ -52,7 +58,7 @@ public class MatchController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
         List<String> regionCodes = parseRegionCodes(regionCode);
-        Long userId = Optional.ofNullable(principal).map(UserPrincipal::getUserId).orElse(null);
+        Long userId = AuthUtils.getUserIdOrNull(principal);
 
         MatchSearchCondition condition = MatchSearchCondition.builder()
                 .regionCodes(regionCodes)
@@ -67,8 +73,70 @@ public class MatchController {
     }
 
     @GetMapping("/{matchId}")
-    public ApiResponse<MatchDetailResponse> getMatchDetail(@PathVariable Long matchId) {
-        MatchDetailResponse response = matchService.getMatchDetail(matchId);
+    public ApiResponse<MatchDetailResponse> getMatchDetail(
+            @IfLogin UserPrincipal principal,
+            @PathVariable Long matchId) {
+        Long userId = AuthUtils.getUserIdOrNull(principal);
+        MatchDetailResponse response = matchService.getMatchDetail(matchId, userId);
+        return ApiResponse.success(response);
+    }
+
+    @PostMapping("/{matchId}/participants")
+    public ApiResponse<ParticipantApplyResponse> applyParticipant(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @PathVariable Long matchId,
+            @Valid @RequestBody(required = false) ParticipantApplyRequest request) {
+        Long userId = AuthUtils.getUserIdOrThrow(principal);
+        ParticipantApplyResponse response = matchParticipantService.applyParticipant(
+                userId, matchId, Optional.ofNullable(request).orElseGet(ParticipantApplyRequest::new));
+        return ApiResponse.success(response);
+    }
+
+    @DeleteMapping("/{matchId}/participants/me")
+    public ApiResponse<Void> cancelParticipant(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @PathVariable Long matchId) {
+        Long userId = AuthUtils.getUserIdOrThrow(principal);
+        matchParticipantService.cancelParticipant(userId, matchId);
+        return ApiResponse.success(null);
+    }
+
+    @PostMapping("/{matchId}/participants/me/accept-offer")
+    public ApiResponse<ParticipantApplyResponse> acceptOffer(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @PathVariable Long matchId) {
+        Long userId = AuthUtils.getUserIdOrThrow(principal);
+        ParticipantApplyResponse response = matchParticipantService.acceptOffer(userId, matchId);
+        return ApiResponse.success(response);
+    }
+
+    @PostMapping("/{matchId}/participants/me/reject-offer")
+    public ApiResponse<ParticipantApplyResponse> rejectOffer(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @PathVariable Long matchId) {
+        Long userId = AuthUtils.getUserIdOrThrow(principal);
+        ParticipantApplyResponse response = matchParticipantService.rejectOffer(userId, matchId);
+        return ApiResponse.success(response);
+    }
+
+    @GetMapping("/{matchId}/participants/applications")
+    public ApiResponse<List<ParticipantApplicationResponse>> getApplications(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @PathVariable Long matchId) {
+        Long hostUserId = AuthUtils.getUserIdOrThrow(principal);
+        List<ParticipantApplicationResponse> response = matchParticipantService.getApplications(hostUserId, matchId);
+        return ApiResponse.success(response);
+    }
+
+    @PatchMapping("/{matchId}/participants/{participationId}")
+    public ApiResponse<ParticipantApplyResponse> decideParticipant(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @PathVariable Long matchId,
+            @PathVariable Long participationId,
+            @Valid @RequestBody ParticipantDecisionRequest request) {
+        Long hostUserId = AuthUtils.getUserIdOrThrow(principal);
+        ParticipantApplyResponse response = matchParticipantService.decideParticipant(
+                hostUserId, matchId, participationId, request);
         return ApiResponse.success(response);
     }
 

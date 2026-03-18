@@ -2,6 +2,7 @@ package org.app.mintonmatchapi.match.service;
 
 import org.app.mintonmatchapi.common.exception.BusinessException;
 import org.app.mintonmatchapi.common.exception.ErrorCode;
+import org.app.mintonmatchapi.common.util.StringUtils;
 import org.app.mintonmatchapi.match.dto.*;
 import org.app.mintonmatchapi.match.entity.Match;
 import org.app.mintonmatchapi.match.entity.MatchParticipant;
@@ -23,6 +24,8 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 import static org.app.mintonmatchapi.match.entity.ParticipantStatus.ACCEPTED;
+import static org.app.mintonmatchapi.match.entity.ParticipantStatus.PENDING;
+import static org.app.mintonmatchapi.match.entity.ParticipantStatus.RESERVED;
 import static org.app.mintonmatchapi.match.entity.ParticipantStatus.WAITING;
 
 @Service
@@ -53,14 +56,13 @@ public class MatchService {
                 .matchDate(request.getMatchDate())
                 .startTime(request.getStartTime())
                 .durationMin(request.getDurationMin())
-                .locationName(trimOrNull(request.getLocationName()))
-                .locationAddress(trimOrNull(request.getLocationAddress()))
+                .locationName(StringUtils.trimOrNull(request.getLocationName()))
                 .regionCode(request.getRegionCode().trim())
                 .maxPeople(request.getMaxPeople())
-                .targetLevels(trimOrNull(request.getTargetLevels()))
+                .targetLevels(StringUtils.trimOrNull(request.getTargetLevels()))
                 .costPolicy(request.getCostPolicy())
                 .status(MatchStatus.RECRUITING)
-                .imageUrl(trimOrNull(request.getImageUrl()))
+                .imageUrl(StringUtils.trimOrNull(request.getImageUrl()))
                 .latitude(request.getLatitude())
                 .longitude(request.getLongitude())
                 .build();
@@ -83,15 +85,16 @@ public class MatchService {
         }
     }
 
-    public MatchDetailResponse getMatchDetail(Long matchId) {
+    @Transactional(readOnly = true)
+    public MatchDetailResponse getMatchDetail(Long matchId, Long userId) {
         Match match = matchRepository.findByIdWithHost(matchId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "매칭을 찾을 수 없습니다."));
+                .orElseThrow(() -> new BusinessException(ErrorCode.MATCH_NOT_FOUND));
 
         List<MatchParticipant> acceptedAndWaiting = matchParticipantRepository.findByMatchIdAndStatusInWithUserOrderByQueueOrderAsc(matchId, List.of(ACCEPTED, WAITING));
         List<MatchParticipant> accepted = acceptedAndWaiting.stream().filter(p -> p.getStatus() == ACCEPTED).toList();
         List<MatchParticipant> waiting = acceptedAndWaiting.stream().filter(p -> p.getStatus() == WAITING).toList();
 
-        return MatchDetailResponse.builder()
+        MatchDetailResponse.MatchDetailResponseBuilder builder = MatchDetailResponse.builder()
                 .matchId(match.getId())
                 .hostId(match.getHost().getId())
                 .title(match.getTitle())
@@ -100,7 +103,6 @@ public class MatchService {
                 .startTime(match.getStartTime())
                 .durationMin(match.getDurationMin())
                 .locationName(match.getLocationName())
-                .locationAddress(match.getLocationAddress())
                 .regionCode(match.getRegionCode())
                 .maxPeople(match.getMaxPeople())
                 .currentPeople(accepted.size())
@@ -114,8 +116,37 @@ public class MatchService {
                 .host(HostSummary.from(match.getHost()))
                 .confirmedParticipants(accepted.stream().map(ParticipantSummary::from).collect(Collectors.toList()))
                 .waitingList(waiting.stream().map(ParticipantSummary::from).collect(Collectors.toList()))
-                .waitingCount(waiting.size())
-                .build();
+                .waitingCount(waiting.size());
+
+        if (userId != null) {
+            MatchParticipant myParticipation = matchParticipantRepository
+                    .findByMatchIdAndUserId(matchId, userId)
+                    .orElse(null);
+
+            builder.myParticipation(MyParticipationSummary.from(myParticipation))
+                    .canApply(resolveCanApply(match, userId, myParticipation))
+                    .canCancel(resolveCanCancel(myParticipation))
+                    .hasWaitingOffer(myParticipation != null && myParticipation.getStatus() == RESERVED);
+        }
+
+        return builder.build();
+    }
+
+    private Boolean resolveCanApply(Match match, Long userId, MatchParticipant myParticipation) {
+        if (match.getStatus() != MatchStatus.RECRUITING) {
+            return false;
+        }
+        if (match.getHost().getId().equals(userId)) {
+            return false;
+        }
+        if (myParticipation != null && myParticipation.getStatus().isActiveParticipation()) {
+            return false;
+        }
+        return true;
+    }
+
+    private Boolean resolveCanCancel(MatchParticipant myParticipation) {
+        return myParticipation != null && myParticipation.getStatus().isActiveParticipation();
     }
 
     public Page<MatchListResponse> getMatchList(MatchSearchCondition condition, Long userId) {
@@ -166,13 +197,5 @@ public class MatchService {
                     .orElse(null);
         }
         return null;
-    }
-
-    private String trimOrNull(String value) {
-        if (value == null || value.isBlank()) {
-            return null;
-        }
-        String trimmed = value.trim();
-        return trimmed.isEmpty() ? null : trimmed;
     }
 }

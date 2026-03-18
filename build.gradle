@@ -42,6 +42,10 @@ dependencies {
     // AWS S3 (Spring Cloud AWS)
     implementation 'io.awspring.cloud:spring-cloud-aws-starter-s3'
 
+    // ShedLock - 스케줄러 다중 인스턴스 시 단일 실행 보장
+    implementation 'net.javacrumbs.shedlock:shedlock-spring:6.3.0'
+    implementation 'net.javacrumbs.shedlock:shedlock-provider-jdbc-template:6.3.0'
+
     // QueryDSL
     implementation 'com.querydsl:querydsl-jpa:5.0.0:jakarta'
     annotationProcessor 'com.querydsl:querydsl-apt:5.0.0:jakarta'

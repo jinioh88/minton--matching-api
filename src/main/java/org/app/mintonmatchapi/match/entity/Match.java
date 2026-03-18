@@ -8,6 +8,7 @@ import lombok.NoArgsConstructor;
 import org.app.mintonmatchapi.common.entity.BaseEntity;
 import org.app.mintonmatchapi.user.entity.User;
 
+import java.time.LocalDateTime;
 import java.time.LocalDate;
 import java.time.LocalTime;
 
@@ -44,9 +45,6 @@ public class Match extends BaseEntity {
     @Column(name = "location_name", length = 200)
     private String locationName;
 
-    @Column(name = "location_address", columnDefinition = "TEXT")
-    private String locationAddress;
-
     @Column(name = "region_code", nullable = false, length = 50)
     private String regionCode;
 
@@ -75,7 +73,7 @@ public class Match extends BaseEntity {
 
     @Builder
     public Match(User host, String title, String description, LocalDate matchDate, LocalTime startTime,
-                 Integer durationMin, String locationName, String locationAddress, String regionCode,
+                 Integer durationMin, String locationName, String regionCode,
                  Integer maxPeople, String targetLevels, CostPolicy costPolicy, MatchStatus status,
                  String imageUrl, Double latitude, Double longitude) {
         this.host = host;
@@ -85,7 +83,6 @@ public class Match extends BaseEntity {
         this.startTime = startTime;
         this.durationMin = durationMin;
         this.locationName = locationName;
-        this.locationAddress = locationAddress;
         this.regionCode = regionCode;
         this.maxPeople = maxPeople;
         this.targetLevels = targetLevels;
@@ -94,5 +91,15 @@ public class Match extends BaseEntity {
         this.imageUrl = imageUrl;
         this.latitude = latitude;
         this.longitude = longitude;
+    }
+
+    /**
+     * 경기 시작 시각이 cutoff 이전인지 확인 (긴급 모드 판단용)
+     * @param cutoff 기준 시각 (예: 현재 + 2시간)
+     * @return 경기 시작이 cutoff보다 이전이면 true (긴급 선착순 모드)
+     */
+    public boolean isWithinEmergencyThreshold(LocalDateTime cutoff) {
+        LocalDateTime matchStart = matchDate.atTime(startTime);
+        return matchStart.isBefore(cutoff);
     }
 }

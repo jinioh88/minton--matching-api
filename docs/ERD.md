@@ -260,7 +260,7 @@ RECRUITING, CLOSED, FINISHED, CANCELLED
 
 2.3 MatchParticipants (참여 및 대기열)
 
-매칭에 신청한 유저들의 상태와 대기 순번을 관리합니다.
+매칭에 신청한 유저들의 상태와 대기 순번을 관리합니다. **하이브리드 타임아웃 시스템** 적용.
 
 컬럼명
 
@@ -298,9 +298,9 @@ status
 
 ENUM
 
-PENDING, ACCEPTED, REJECTED, WAITING
+PENDING, ACCEPTED, REJECTED, WAITING, RESERVED, CANCELLED
 
-신청 상태 (대기열 포함)
+신청 상태. RESERVED=참여 기회 부여(15분 내 수락 대기), CANCELLED=본인 취소
 
 queue_order
 
@@ -317,6 +317,14 @@ VARCHAR(200)
 -
 
 신청 한마디
+
+offer_expires_at
+
+TIMESTAMP
+
+-
+
+예약 만료 시각 (RESERVED일 때, 15분 타임아웃)
 
 attendance
 

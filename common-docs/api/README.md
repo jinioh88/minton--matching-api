@@ -8,6 +8,7 @@
 |----------|------|------|
 | Sprint 1 | [Sprint1-API.md](./Sprint1-API.md) | OAuth2 소셜 로그인, 프로필 API |
 | Sprint 2 | [Sprint2-API.md](./Sprint2-API.md) | S3 파일 업로드, 프로필 이미지, 매칭 API |
+| Sprint 3 | [Sprint3-API.md](./Sprint3-API.md) | 참여 신청, 수락/거절, 대기열, 취소 API |
 
 ---
 
@@ -55,6 +56,12 @@
 | POST | /api/matches | Sprint 2 | 매칭 생성 |
 | GET | /api/matches | Sprint 2 | 매칭 목록 조회 |
 | GET | /api/matches/{matchId} | Sprint 2 | 매칭 상세 조회 |
+| POST | /api/matches/{matchId}/participants | Sprint 3 | 참여/대기 신청 |
+| PATCH | /api/matches/{matchId}/participants/{participationId} | Sprint 3 | 방장 수락/거절 |
+| DELETE | /api/matches/{matchId}/participants/me | Sprint 3 | 참여 취소 |
+| POST | /api/matches/{matchId}/participants/me/accept-offer | Sprint 3 | 예약 수락 |
+| POST | /api/matches/{matchId}/participants/me/reject-offer | Sprint 3 | 예약 거절 |
+| GET | /api/matches/{matchId}/participants/applications | Sprint 3 | 방장 신청 목록 조회 |
 
 ---
 
@@ -80,4 +87,4 @@
 
 ---
 
-**Sprint 1 API 상세**는 [Sprint1-API.md](./Sprint1-API.md), **Sprint 2 API 상세**는 [Sprint2-API.md](./Sprint2-API.md)를 참조하세요.
+**Sprint 1 API 상세**는 [Sprint1-API.md](./Sprint1-API.md), **Sprint 2 API 상세**는 [Sprint2-API.md](./Sprint2-API.md), **Sprint 3 API 상세**는 [Sprint3-API.md](./Sprint3-API.md)를 참조하세요.

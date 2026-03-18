@@ -23,7 +23,6 @@ public class MatchDetailResponse {
     private LocalTime startTime;
     private Integer durationMin;
     private String locationName;
-    private String locationAddress;
     private String regionCode;
     private Integer maxPeople;
     private Integer currentPeople;
@@ -39,4 +38,9 @@ public class MatchDetailResponse {
     private List<ParticipantSummary> confirmedParticipants;
     private List<ParticipantSummary> waitingList;
     private int waitingCount;
+
+    private MyParticipationSummary myParticipation;
+    private Boolean canApply;
+    private Boolean canCancel;
+    private Boolean hasWaitingOffer;
 }

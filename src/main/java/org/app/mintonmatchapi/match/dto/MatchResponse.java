@@ -22,7 +22,6 @@ public class MatchResponse {
     private LocalTime startTime;
     private Integer durationMin;
     private String locationName;
-    private String locationAddress;
     private String regionCode;
     private Integer maxPeople;
     private String targetLevels;
@@ -43,7 +42,6 @@ public class MatchResponse {
                 .startTime(match.getStartTime())
                 .durationMin(match.getDurationMin())
                 .locationName(match.getLocationName())
-                .locationAddress(match.getLocationAddress())
                 .regionCode(match.getRegionCode())
                 .maxPeople(match.getMaxPeople())
                 .targetLevels(match.getTargetLevels())
