@@ -16,7 +16,7 @@ public enum ErrorCode {
     HOST_CANNOT_APPLY(HttpStatus.BAD_REQUEST, "방장은 참여 신청할 수 없습니다."),
     PARTICIPANT_NOT_FOUND(HttpStatus.NOT_FOUND, "참여 신청을 찾을 수 없습니다."),
     INVALID_STATUS(HttpStatus.BAD_REQUEST, "이미 수락 또는 거절된 신청입니다."),
-    MATCH_FULL(HttpStatus.BAD_REQUEST, "정원이 초과되어 수락할 수 없습니다."),
+    MATCH_FULL(HttpStatus.BAD_REQUEST, "정원이 가득 찼습니다."),
     CANNOT_CANCEL(HttpStatus.BAD_REQUEST, "취소할 수 없는 상태입니다."),
     OFFER_EXPIRED(HttpStatus.BAD_REQUEST, "예약 기회가 만료되었습니다."),
     OAUTH_INVALID(HttpStatus.BAD_REQUEST, "OAuth 인증에 실패했습니다."),

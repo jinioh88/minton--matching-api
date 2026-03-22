@@ -53,6 +53,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/**", "/api/health", "/api/users/check-nickname").permitAll()
                         .requestMatchers("/api/users/me", "/api/users/me/**", "/api/files/upload").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/matches").authenticated()
+                        .requestMatchers(HttpMethod.PATCH, "/api/matches/*").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/matches/*/participants").authenticated()
                         .requestMatchers(HttpMethod.DELETE, "/api/matches/*/participants/me").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/matches/*/participants/me/accept-offer").authenticated()

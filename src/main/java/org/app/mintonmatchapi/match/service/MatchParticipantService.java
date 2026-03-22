@@ -64,8 +64,15 @@ public class MatchParticipantService {
             throw new BusinessException(ErrorCode.HOST_CANNOT_APPLY);
         }
 
-        Optional<MatchParticipant> existing = matchParticipantRepository.findByMatchIdAndUserId(matchId, currentUserId);
-        if (existing.isPresent() && existing.get().getStatus().isActiveParticipation()) {
+        List<MatchParticipant> existingList = matchParticipantRepository.findByMatchIdAndUserIdAll(matchId, currentUserId);
+        MatchParticipant existingReusable = existingList.stream()
+                .filter(p -> p.getStatus() == ParticipantStatus.CANCELLED || p.getStatus() == ParticipantStatus.REJECTED)
+                .findFirst()
+                .orElse(null);
+        boolean hasActiveParticipation = existingList.stream()
+                .anyMatch(p -> p.getStatus().isActiveParticipation());
+
+        if (hasActiveParticipation) {
             throw new BusinessException(ErrorCode.ALREADY_APPLIED);
         }
 
@@ -78,7 +85,7 @@ public class MatchParticipantService {
         ParticipantStatus status;
         int queueOrder;
 
-        if (acceptedCount < match.getMaxPeople()) {
+        if (!match.isFull(acceptedCount)) {
             status = PENDING;
             queueOrder = 0;
         } else {
@@ -86,15 +93,20 @@ public class MatchParticipantService {
             queueOrder = matchParticipantRepository.findMaxQueueOrderByMatchId(matchId) + 1;
         }
 
-        MatchParticipant participant = MatchParticipant.builder()
-                .match(match)
-                .user(user)
-                .status(status)
-                .queueOrder(queueOrder)
-                .applyMessage(applyMessage)
-                .build();
-
-        MatchParticipant saved = matchParticipantRepository.save(participant);
+        MatchParticipant saved;
+        if (existingReusable != null) {
+            existingReusable.reapply(status, queueOrder, applyMessage);
+            saved = matchParticipantRepository.save(existingReusable);
+        } else {
+            MatchParticipant participant = MatchParticipant.builder()
+                    .match(match)
+                    .user(user)
+                    .status(status)
+                    .queueOrder(queueOrder)
+                    .applyMessage(applyMessage)
+                    .build();
+            saved = matchParticipantRepository.save(participant);
+        }
         return ParticipantApplyResponse.from(saved);
     }
 
@@ -106,17 +118,29 @@ public class MatchParticipantService {
 
         Match match = participant.getMatch();
         if (!match.getHost().getId().equals(hostUserId)) {
-            throw new BusinessException(ErrorCode.FORBIDDEN, "방장만 수락/거절할 수 있습니다.");
+            throw new BusinessException(ErrorCode.FORBIDDEN, "방장만 수락/거절/추방할 수 있습니다.");
         }
 
         ParticipantStatus status = participant.getStatus();
+        ParticipantDecisionRequest.ParticipantDecisionAction action = request.getAction();
+
+        if (action == ParticipantDecisionRequest.ParticipantDecisionAction.KICK) {
+            if (status != ACCEPTED) {
+                throw new BusinessException(ErrorCode.INVALID_STATUS, "확정된 참여자만 추방할 수 있습니다.");
+            }
+            participant.changeToCancelled();
+            matchParticipantRepository.save(participant);
+            eventPublisher.publishEvent(new ParticipantCancelledEvent(this, matchId, true, false));
+            return ParticipantApplyResponse.from(participant);
+        }
+
         if (status != PENDING && status != WAITING) {
             throw new BusinessException(ErrorCode.INVALID_STATUS);
         }
 
-        if (request.getAction() == ParticipantDecisionRequest.ParticipantDecisionAction.ACCEPT) {
+        if (action == ParticipantDecisionRequest.ParticipantDecisionAction.ACCEPT) {
             long acceptedCount = matchParticipantRepository.countByMatchIdAndStatus(matchId, ACCEPTED);
-            if (acceptedCount >= match.getMaxPeople()) {
+            if (match.isFull(acceptedCount)) {
                 throw new BusinessException(ErrorCode.MATCH_FULL);
             }
             participant.changeToAccepted();
@@ -130,7 +154,7 @@ public class MatchParticipantService {
 
     @Transactional
     public void cancelParticipant(Long userId, Long matchId) {
-        MatchParticipant participant = matchParticipantRepository.findByMatchIdAndUserId(matchId, userId)
+        MatchParticipant participant = matchParticipantRepository.findActiveByMatchIdAndUserId(matchId, userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.PARTICIPANT_NOT_FOUND));
 
         if (!participant.getStatus().isActiveParticipation()) {
@@ -148,13 +172,13 @@ public class MatchParticipantService {
 
     @Transactional
     public ParticipantApplyResponse acceptOffer(Long userId, Long matchId) {
-        MatchParticipant participant = matchParticipantRepository.findByMatchIdAndUserId(matchId, userId)
+        MatchParticipant participant = matchParticipantRepository.findActiveByMatchIdAndUserId(matchId, userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.PARTICIPANT_NOT_FOUND));
 
         Match match = matchRepository.findByIdWithHostForUpdate(matchId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.MATCH_NOT_FOUND));
         long acceptedCount = matchParticipantRepository.countByMatchIdAndStatus(matchId, ACCEPTED);
-        if (acceptedCount >= match.getMaxPeople()) {
+        if (match.isFull(acceptedCount)) {
             throw new BusinessException(ErrorCode.MATCH_FULL);
         }
 
@@ -190,7 +214,7 @@ public class MatchParticipantService {
 
     @Transactional
     public ParticipantApplyResponse rejectOffer(Long userId, Long matchId) {
-        MatchParticipant participant = matchParticipantRepository.findByMatchIdAndUserId(matchId, userId)
+        MatchParticipant participant = matchParticipantRepository.findActiveByMatchIdAndUserId(matchId, userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.PARTICIPANT_NOT_FOUND));
 
         if (participant.getStatus() != RESERVED) {

@@ -45,7 +45,7 @@ public class QueuePromotionService {
         }
 
         long acceptedCount = matchParticipantRepository.countByMatchIdAndStatus(matchId, ACCEPTED);
-        if (acceptedCount >= match.getMaxPeople()) {
+        if (match.isFull(acceptedCount)) {
             return; // 정원이 이미 찼으면 승격 불필요
         }
 

@@ -10,11 +10,12 @@ import lombok.Setter;
 @NoArgsConstructor
 public class ParticipantDecisionRequest {
 
-    @NotNull(message = "수락/거절 액션을 선택해 주세요.")
+    @NotNull(message = "수락/거절/추방 액션을 선택해 주세요.")
     private ParticipantDecisionAction action;
 
     public enum ParticipantDecisionAction {
-        ACCEPT,
-        REJECT
+        ACCEPT,   // PENDING/WAITING → 수락
+        REJECT,   // PENDING/WAITING → 거절
+        KICK      // ACCEPTED → 추방 (방장 전용)
     }
 }

@@ -3,6 +3,7 @@ package org.app.mintonmatchapi.match.service;
 import org.app.mintonmatchapi.common.exception.BusinessException;
 import org.app.mintonmatchapi.common.exception.ErrorCode;
 import org.app.mintonmatchapi.common.util.StringUtils;
+import org.app.mintonmatchapi.match.config.QueueProperties;
 import org.app.mintonmatchapi.match.dto.*;
 import org.app.mintonmatchapi.match.entity.Match;
 import org.app.mintonmatchapi.match.entity.MatchParticipant;
@@ -17,7 +18,9 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.Map;
@@ -34,12 +37,14 @@ public class MatchService {
     private final MatchRepository matchRepository;
     private final MatchParticipantRepository matchParticipantRepository;
     private final UserRepository userRepository;
+    private final QueueProperties queueProperties;
 
     public MatchService(MatchRepository matchRepository, MatchParticipantRepository matchParticipantRepository,
-                       UserRepository userRepository) {
+                       UserRepository userRepository, QueueProperties queueProperties) {
         this.matchRepository = matchRepository;
         this.matchParticipantRepository = matchParticipantRepository;
         this.userRepository = userRepository;
+        this.queueProperties = queueProperties;
     }
 
     @Transactional
@@ -105,7 +110,7 @@ public class MatchService {
                 .locationName(match.getLocationName())
                 .regionCode(match.getRegionCode())
                 .maxPeople(match.getMaxPeople())
-                .currentPeople(accepted.size())
+                .currentPeople(accepted.size() + 1)  // 방장 포함
                 .targetLevels(match.getTargetLevels())
                 .costPolicy(match.getCostPolicy())
                 .status(match.getStatus())
@@ -116,11 +121,13 @@ public class MatchService {
                 .host(HostSummary.from(match.getHost()))
                 .confirmedParticipants(accepted.stream().map(ParticipantSummary::from).collect(Collectors.toList()))
                 .waitingList(waiting.stream().map(ParticipantSummary::from).collect(Collectors.toList()))
-                .waitingCount(waiting.size());
+                .waitingCount(waiting.size())
+                .serverTime(Instant.now().toString())
+                .isEmergencyMode(match.isWithinEmergencyThreshold(LocalDateTime.now().plusHours(queueProperties.getEmergencyThresholdHours())));
 
         if (userId != null) {
             MatchParticipant myParticipation = matchParticipantRepository
-                    .findByMatchIdAndUserId(matchId, userId)
+                    .findFirstByMatch_IdAndUser_IdOrderByIdDesc(matchId, userId)
                     .orElse(null);
 
             builder.myParticipation(MyParticipationSummary.from(myParticipation))
@@ -173,10 +180,78 @@ public class MatchService {
         Map<Long, Integer> currentPeopleMap = countResults.stream()
                 .collect(Collectors.toMap(
                         row -> (Long) row[0],
-                        row -> ((Number) row[1]).intValue()
+                        row -> ((Number) row[1]).intValue() + 1  // 방장 포함
                 ));
 
-        return matches.map(m -> MatchListResponse.of(m, currentPeopleMap.getOrDefault(m.getId(), 0)));
+        return matches.map(m -> MatchListResponse.of(m, currentPeopleMap.getOrDefault(m.getId(), 1)));
+    }
+
+    @Transactional
+    public MatchResponse updateMatch(Long hostUserId, Long matchId, MatchUpdateRequest request) {
+        Match match = matchRepository.findByIdWithHost(matchId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.MATCH_NOT_FOUND));
+
+        if (!match.getHost().getId().equals(hostUserId)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "방장만 매칭을 수정할 수 있습니다.");
+        }
+
+        if (match.getStatus() != MatchStatus.RECRUITING) {
+            throw new BusinessException(ErrorCode.MATCH_NOT_RECRUITING, "모집 중인 매칭만 수정할 수 있습니다.");
+        }
+
+        if (request.getMaxPeople() != null) {
+            long acceptedCount = matchParticipantRepository.countByMatchIdAndStatus(matchId, ACCEPTED);
+            int currentPeople = (int) acceptedCount + 1;
+            if (request.getMaxPeople() < currentPeople) {
+                throw new BusinessException(ErrorCode.BAD_REQUEST,
+                        "정원을 현재 확정 인원(" + currentPeople + "명)보다 낮게 설정할 수 없습니다.");
+            }
+        }
+
+        if (request.getMatchDate() != null || request.getStartTime() != null) {
+            LocalDate date = request.getMatchDate() != null ? request.getMatchDate() : match.getMatchDate();
+            LocalTime time = request.getStartTime() != null ? request.getStartTime() : match.getStartTime();
+            validateMatchDateTime(date, time);
+        }
+
+        if (request.getTitle() != null && request.getTitle().isBlank()) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "제목은 비워둘 수 없습니다.");
+        }
+        if (request.getDescription() != null && request.getDescription().isBlank()) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "설명은 비워둘 수 없습니다.");
+        }
+
+        match.update(
+                request.getTitle(),
+                request.getDescription(),
+                request.getMatchDate(),
+                request.getStartTime(),
+                request.getDurationMin(),
+                request.getLocationName(),
+                request.getRegionCode(),
+                request.getMaxPeople(),
+                request.getTargetLevels(),
+                request.getCostPolicy(),
+                request.getImageUrl(),
+                request.getLatitude(),
+                request.getLongitude()
+        );
+
+        Match saved = matchRepository.save(match);
+        return MatchResponse.from(saved);
+    }
+
+    private void validateMatchDateTime(LocalDate matchDate, LocalTime startTime) {
+        LocalDate today = LocalDate.now();
+        if (matchDate.isBefore(today)) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "경기 날짜는 오늘 이후여야 합니다.");
+        }
+        if (matchDate.equals(today)) {
+            LocalTime now = LocalTime.now();
+            if (startTime.isBefore(now) || startTime.equals(now)) {
+                throw new BusinessException(ErrorCode.BAD_REQUEST, "시작 시간은 현재 시간 이후여야 합니다.");
+            }
+        }
     }
 
     /**

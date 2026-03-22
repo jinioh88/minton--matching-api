@@ -7,6 +7,7 @@ import org.app.mintonmatchapi.auth.annotation.IfLogin;
 import org.app.mintonmatchapi.common.dto.ApiResponse;
 import org.app.mintonmatchapi.match.dto.MatchCreateRequest;
 import org.app.mintonmatchapi.match.dto.MatchDetailResponse;
+import org.app.mintonmatchapi.match.dto.MatchUpdateRequest;
 import org.app.mintonmatchapi.match.dto.MatchListResponse;
 import org.app.mintonmatchapi.match.dto.MatchResponse;
 import org.app.mintonmatchapi.match.dto.MatchSearchCondition;
@@ -70,6 +71,16 @@ public class MatchController {
 
         Page<MatchListResponse> result = matchService.getMatchList(condition, userId);
         return ApiResponse.success(result);
+    }
+
+    @PatchMapping("/{matchId}")
+    public ApiResponse<MatchResponse> updateMatch(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @PathVariable Long matchId,
+            @Valid @RequestBody MatchUpdateRequest request) {
+        Long hostUserId = AuthUtils.getUserIdOrThrow(principal);
+        MatchResponse response = matchService.updateMatch(hostUserId, matchId, request);
+        return ApiResponse.success(response);
     }
 
     @GetMapping("/{matchId}")

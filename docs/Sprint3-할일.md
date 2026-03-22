@@ -12,6 +12,7 @@
 - [ ] 정원 초과 시 대기 신청 가능
 - [ ] 취소 시 대기열 하이브리드 시스템 동작 (순차 기회 → 타임아웃 → 긴급 선착순)
 - [ ] 방장이 신청자 목록을 보고 수락/거절 가능
+- [ ] 방장이 매칭 정보(제목, 장소, 일시 등)를 수정할 수 있다 (모집 중 상태에서만)
 
 ---
 
@@ -237,13 +238,48 @@
 
 - [ ] common-docs/api/Sprint3-API.md 또는 기존 문서에 Sprint 3 API 추가
   - POST /api/matches/{matchId}/participants (참여/대기 신청)
-  - PATCH /api/matches/{matchId}/participants/{participationId} (방장 수락/거절)
+  - PATCH /api/matches/{matchId}/participants/{participationId} (방장 수락/거절/추방)
   - DELETE /api/matches/{matchId}/participants/me (참여 취소)
   - POST /api/matches/{matchId}/participants/me/accept-offer (예약 수락 - 대기열 사용자)
   - POST /api/matches/{matchId}/participants/me/reject-offer (예약 거절 - 대기열 사용자)
   - GET /api/matches/{matchId}/participants/applications (방장용 신청 목록)
+  - **PATCH /api/matches/{matchId}** (매칭 정보 수정 - 방장만, 모집 중 상태에서만)
 - [ ] Request/Response 예시, ParticipantStatus 확장(RESERVED, CANCELLED) 반영
 - [ ] 대기열 하이브리드 시스템(순차/타임아웃/긴급 선착순) 설명
+
+---
+
+## Step 8: 매칭 수정 API (B3-7, B3-8)
+
+> 요구사항: `docs/요구사항분석.md` 매칭 수정 절, `docs/제품백로그.md` B3-7, B3-8
+
+### Step 8.1: 매칭 수정 요청 DTO
+- [ ] `MatchUpdateRequest`
+  - title (String, 선택, 최대 100자)
+  - description (String, 선택)
+  - matchDate (LocalDate, 선택)
+  - startTime (LocalTime, 선택)
+  - durationMin (Integer, 선택, 30~240)
+  - locationName (String, 선택)
+  - regionCode (String, 선택)
+  - maxPeople (Integer, 선택, 2~12)
+  - targetLevels (String, 선택)
+  - costPolicy (CostPolicy, 선택)
+  - imageUrl (String, 선택)
+
+### Step 8.2: 매칭 수정 API
+- [ ] PATCH /api/matches/{matchId} (인증 필요)
+  - **방장만** 호출 가능
+  - **모집 중(RECRUITING)** 상태에서만 수정 가능
+- [ ] MatchService.updateMatch(hostUserId, matchId, request)
+  - hostId 검증
+  - MatchStatus == RECRUITING 확인
+  - **정원 검증**: maxPeople 수정 시 `maxPeople >= currentPeople` (방장 포함) 필수. 현재 확정 인원보다 낮게 설정 불가
+
+### Step 8.3: 예외 처리
+- [ ] FORBIDDEN (방장이 아님)
+- [ ] MATCH_NOT_FOUND
+- [ ] BAD_REQUEST (모집 중이 아님, 정원을 currentPeople보다 낮게 수정 시도)
 
 ---
 
@@ -258,6 +294,7 @@
 | 5 | 방장 신청 관리 API | B4-3 |
 | 6 | 매칭 상세 myParticipation 확장 | B4-1~5 |
 | 7 | API 문서 | B1-3 |
+| 8 | 매칭 수정 API | B3-7, B3-8 |
 
 ---
 
@@ -269,12 +306,14 @@ Step 1 (Repository) → Step 2 (참여 신청) → Step 3 (수락/거절)
 Step 4 (취소, 대기열 승인) ← Step 3 완료 후
 Step 5 (방장 신청 관리) ← Step 2, 3과 병렬 가능
 Step 6 (상세 확장) ← Step 2 완료 후
+Step 8 (매칭 수정) ← Step 1 완료 후 (Match 조회 가능 시점)
 Step 7 (API 문서) ← 모든 API 완료 후
 ```
 
 - Step 1 → Step 2 → Step 3 → Step 4 순차 진행
 - Step 5는 Step 2, 3과 독립적으로 병렬 가능
 - Step 6은 Step 2 완료 후 진행
+- Step 8은 매칭 생성(Step 1) 완료 후 진행 가능
 
 ---
 
@@ -284,6 +323,7 @@ Step 7 (API 문서) ← 모든 API 완료 후
 - match/dto/ParticipantApplyRequest.java
 - match/dto/ParticipantDecisionRequest.java
 - match/dto/ParticipantApplicationResponse.java
+- match/dto/MatchUpdateRequest.java (Step 8)
 - match/dto/MyParticipationSummary.java (또는 기존 ParticipantSummary 확장)
 - match/service/MatchParticipantService.java
 - match/controller/MatchParticipantController.java (또는 MatchController 하위 매핑)
@@ -292,10 +332,11 @@ Step 7 (API 문서) ← 모든 API 완료 후
 - **config/AsyncConfig.java** - @Async Executor 설정 (선택)
 
 ### 수정
+- match/service/MatchService.java (상세 조회 myParticipation, updateMatch - Step 8)
+- match/controller/MatchController.java (PATCH /api/matches/{matchId} - Step 8)
 - match/entity/ParticipantStatus.java (RESERVED, CANCELLED 추가)
 - match/entity/MatchParticipant.java (offerExpiresAt 컬럼 추가)
 - match/repository/MatchParticipantRepository.java (메서드 추가, 비관적 락 쿼리)
-- match/service/MatchService.java (상세 조회 시 myParticipation 추가)
 - match/dto/MatchDetailResponse.java (myParticipation 필드)
 - config/SecurityConfig.java (새 API 경로 인증 설정)
 
@@ -314,6 +355,7 @@ Sprint 3 프론트엔드 작업 (본 API 프로젝트 범위 아님):
 - 참여 취소: 내 참여 취소 버튼
 - **예약 수락/거절 UI**: "참석 기회가 생겼습니다! 15분 내 수락" 알림 → 수락/거절 버튼
 - 상태 표시: 수락 대기 중, 확정, 대기열, **예약 대기(15분)**
+- **매칭 수정 UI**: 매칭 상세 화면(방장 본인)에 [수정] 버튼 → 매칭 만들기와 동일한 폼(기존 값 채움). 정원 수정 시 currentPeople보다 낮게 설정 불가 안내
 
 ---
 

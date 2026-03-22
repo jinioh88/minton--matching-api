@@ -34,7 +34,7 @@ dependencies {
     implementation 'com.fasterxml.jackson.core:jackson-databind'
     implementation 'io.jsonwebtoken:jjwt-api:0.12.6'
     runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.6'
-    runtimeOnly 'com.h2database:h2'
+    implementation 'com.h2database:h2'  // LocalH2ServerStarter에서 TCP 서버 시작용
     runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.6'
 
     runtimeOnly 'com.mysql:mysql-connector-j'

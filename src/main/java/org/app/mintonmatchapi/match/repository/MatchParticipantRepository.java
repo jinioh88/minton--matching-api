@@ -25,9 +25,31 @@ public interface MatchParticipantRepository extends JpaRepository<MatchParticipa
     List<Object[]> countByMatchIdsAndStatus(@Param("matchIds") List<Long> matchIds, @Param("status") ParticipantStatus status);
 
     /**
-     * 중복 신청 방지, 기존 참여 여부 확인
+     * 매칭+사용자별 모든 참여 이력 조회 (재신청 시 CANCELLED/REJECTED 재사용 판단용)
      */
-    Optional<MatchParticipant> findByMatchIdAndUserId(Long matchId, Long userId);
+    @Query("SELECT mp FROM MatchParticipant mp WHERE mp.match.id = :matchId AND mp.user.id = :userId")
+    List<MatchParticipant> findByMatchIdAndUserIdAll(@Param("matchId") Long matchId, @Param("userId") Long userId);
+
+    /**
+     * 활성 참여(PENDING/ACCEPTED/WAITING/RESERVED) 1건 조회. 여러 건이면 최신 1건 반환
+     */
+    @Query("SELECT mp FROM MatchParticipant mp WHERE mp.match.id = :matchId AND mp.user.id = :userId AND mp.status IN :statuses ORDER BY mp.id DESC")
+    List<MatchParticipant> findByMatchIdAndUserIdAndStatusInOrderByIdDesc(
+            @Param("matchId") Long matchId, @Param("userId") Long userId, @Param("statuses") List<ParticipantStatus> statuses);
+
+    /**
+     * 매칭 상세 조회 시 사용자 참여 상태 표시용. REJECTED/CANCELLED 포함 최신 1건 반환
+     */
+    Optional<MatchParticipant> findFirstByMatch_IdAndUser_IdOrderByIdDesc(Long matchId, Long userId);
+
+    /**
+     * 활성 참여 1건 조회 (cancel, accept-offer, reject-offer용)
+     */
+    default Optional<MatchParticipant> findActiveByMatchIdAndUserId(Long matchId, Long userId) {
+        List<MatchParticipant> list = findByMatchIdAndUserIdAndStatusInOrderByIdDesc(matchId, userId,
+                List.of(ParticipantStatus.PENDING, ParticipantStatus.ACCEPTED, ParticipantStatus.WAITING, ParticipantStatus.RESERVED));
+        return list.isEmpty() ? Optional.empty() : Optional.of(list.get(0));
+    }
 
     /**
      * 대기열 1번 조회용 (특정 상태의 queueOrder 최소 1건)

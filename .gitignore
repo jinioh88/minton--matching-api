@@ -39,3 +39,6 @@ out/
 
 # 로컬 전용 설정 파일 (절대 커밋 금지)
 **/src/main/resources/application-local.yml
+
+# H2 로컬 DB 파일 (application-local에서 file: 저장 시 생성)
+data/

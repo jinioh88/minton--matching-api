@@ -17,6 +17,17 @@
 
 ---
 
+## 매칭 인원 정책 (maxPeople, currentPeople)
+
+| 필드 | 정의 |
+|------|------|
+| **maxPeople** | 방장 포함 총 확정 인원 상한. 예: 4이면 방장 1명 + 게스트 최대 3명 = 총 4명 |
+| **currentPeople** | 방장 포함 현재 확정 인원 수. ACCEPTED 게스트 수 + 방장(1) |
+
+정원 체크: `currentPeople < maxPeople`일 때만 수락 가능. 정원 초과 시 **MATCH_FULL(400)** "정원이 가득 찼습니다".
+
+---
+
 ## 상세 API
 
 ### 1. 이미지 파일 업로드
@@ -123,7 +134,7 @@
 | durationMin | Integer | O | 소요 시간(분, 30~240) |
 | locationName | String | X | 장소명 (최대 200자) |
 | regionCode | String | O | 행정구역 코드 (7~10자리 숫자) |
-| maxPeople | Integer | O | 모집 인원 (2~12) |
+| maxPeople | Integer | O | **방장 포함** 총 확정 인원 상한 (2~12). 예: 4이면 방장 1명 + 게스트 최대 3명 |
 | targetLevels | String | X | 희망 급수 (예: "A,B,C") |
 | costPolicy | CostPolicy | O | 비용 분담 방식 (enum) |
 | imageUrl | String | X | 매칭 대표 이미지 URL (이미지 파일 업로드 API `POST /api/files/upload` 응답의 `url` 값 사용) |

@@ -94,6 +94,16 @@ public class Match extends BaseEntity {
     }
 
     /**
+     * 정원이 가득 찼는지 (방장 포함 기준).
+     * maxPeople은 방장 포함 총 확정 인원 상한이다.
+     *
+     * @param acceptedCount ACCEPTED 상태 참가자 수 (방장 제외)
+     */
+    public boolean isFull(long acceptedCount) {
+        return acceptedCount + 1 >= maxPeople;
+    }
+
+    /**
      * 경기 시작 시각이 cutoff 이전인지 확인 (긴급 모드 판단용)
      * @param cutoff 기준 시각 (예: 현재 + 2시간)
      * @return 경기 시작이 cutoff보다 이전이면 true (긴급 선착순 모드)
@@ -101,5 +111,52 @@ public class Match extends BaseEntity {
     public boolean isWithinEmergencyThreshold(LocalDateTime cutoff) {
         LocalDateTime matchStart = matchDate.atTime(startTime);
         return matchStart.isBefore(cutoff);
+    }
+
+    /**
+     * 매칭 정보 수정 (partial update). null이 아닌 필드만 반영.
+     */
+    public void update(String title, String description, LocalDate matchDate, LocalTime startTime,
+                      Integer durationMin, String locationName, String regionCode, Integer maxPeople,
+                      String targetLevels, CostPolicy costPolicy, String imageUrl, Double latitude, Double longitude) {
+        if (title != null) {
+            this.title = title.trim();
+        }
+        if (description != null) {
+            this.description = description.trim();
+        }
+        if (matchDate != null) {
+            this.matchDate = matchDate;
+        }
+        if (startTime != null) {
+            this.startTime = startTime;
+        }
+        if (durationMin != null) {
+            this.durationMin = durationMin;
+        }
+        if (locationName != null) {
+            this.locationName = locationName.trim().isEmpty() ? null : locationName.trim();
+        }
+        if (regionCode != null) {
+            this.regionCode = regionCode.trim();
+        }
+        if (maxPeople != null) {
+            this.maxPeople = maxPeople;
+        }
+        if (targetLevels != null) {
+            this.targetLevels = targetLevels.trim().isEmpty() ? null : targetLevels.trim();
+        }
+        if (costPolicy != null) {
+            this.costPolicy = costPolicy;
+        }
+        if (imageUrl != null) {
+            this.imageUrl = imageUrl.trim().isEmpty() ? null : imageUrl.trim();
+        }
+        if (latitude != null) {
+            this.latitude = latitude;
+        }
+        if (longitude != null) {
+            this.longitude = longitude;
+        }
     }
 }

@@ -86,6 +86,16 @@ public class MatchParticipant extends BaseEntity {
     }
 
     /**
+     * CANCELLED/REJECTED 상태에서 재신청 시 상태 갱신
+     */
+    public void reapply(ParticipantStatus newStatus, int newQueueOrder, String applyMessage) {
+        this.status = newStatus;
+        this.queueOrder = newQueueOrder;
+        this.applyMessage = applyMessage;
+        this.offerExpiresAt = null;
+    }
+
+    /**
      * RESERVED 상태에서 예약 만료 여부
      */
     public boolean isOfferExpired() {

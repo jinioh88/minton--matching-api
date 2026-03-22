@@ -43,4 +43,9 @@ public class MatchDetailResponse {
     private Boolean canApply;
     private Boolean canCancel;
     private Boolean hasWaitingOffer;
+
+    /** 서버 시각 (ISO 8601). offerExpiresAt 카운트다운 정확도 향상용 */
+    private String serverTime;
+    /** 긴급 선착순 모드 여부 (경기 시작 2시간 미만 시 true) */
+    private Boolean isEmergencyMode;
 }

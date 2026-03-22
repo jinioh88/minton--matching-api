@@ -7,6 +7,8 @@ import org.app.mintonmatchapi.match.entity.ParticipantStatus;
 import org.app.mintonmatchapi.user.entity.User;
 
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.stream.Stream;
 
 @Getter
 @Builder
@@ -17,6 +19,8 @@ public class ParticipantApplicationResponse {
     private String nickname;
     private String profileImg;
     private Float ratingScore;
+    private String level;
+    private List<String> interestRegions;
     private ParticipantStatus status;
     private Integer queueOrder;
     private String applyMessage;
@@ -34,11 +38,23 @@ public class ParticipantApplicationResponse {
                 .nickname(user != null ? user.getNickname() : null)
                 .profileImg(user != null ? user.getProfileImg() : null)
                 .ratingScore(user != null ? user.getRatingScore() : null)
+                .level(user != null && user.getLevel() != null ? user.getLevel().name() : null)
+                .interestRegions(buildInterestRegions(user))
                 .status(participant.getStatus())
                 .queueOrder(participant.getQueueOrder())
                 .applyMessage(participant.getApplyMessage())
                 .appliedAt(participant.getCreatedAt())
                 .offerExpiresAt(participant.getOfferExpiresAt())
                 .build();
+    }
+
+    private static List<String> buildInterestRegions(User user) {
+        if (user == null) {
+            return List.of();
+        }
+        return Stream.of(user.getInterestLoc1(), user.getInterestLoc2())
+                .filter(loc -> loc != null && !loc.isBlank())
+                .limit(2)
+                .toList();
     }
 }
