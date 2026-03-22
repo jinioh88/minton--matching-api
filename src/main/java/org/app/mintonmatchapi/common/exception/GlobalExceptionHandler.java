@@ -5,6 +5,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.stream.Collectors;
 
@@ -17,6 +18,14 @@ public class GlobalExceptionHandler {
         log.warn("BusinessException: {}", e.getMessage());
         ErrorResponse response = ErrorResponse.of(e.getErrorCode(), e.getMessage());
         return ResponseEntity.status(e.getErrorCode().getStatus()).body(response);
+    }
+
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ErrorResponse> handleNoResourceFound(NoResourceFoundException e) {
+        log.warn("No handler or static resource: {}", e.getResourcePath());
+        ErrorResponse response = ErrorResponse.of(ErrorCode.NOT_FOUND,
+                "요청한 경로에 해당하는 API가 없습니다: " + e.getResourcePath());
+        return ResponseEntity.status(ErrorCode.NOT_FOUND.getStatus()).body(response);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

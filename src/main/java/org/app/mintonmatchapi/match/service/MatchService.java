@@ -3,7 +3,10 @@ package org.app.mintonmatchapi.match.service;
 import org.app.mintonmatchapi.common.exception.BusinessException;
 import org.app.mintonmatchapi.common.exception.ErrorCode;
 import org.app.mintonmatchapi.common.util.StringUtils;
+import lombok.extern.slf4j.Slf4j;
+import org.app.mintonmatchapi.match.config.MatchProperties;
 import org.app.mintonmatchapi.match.config.QueueProperties;
+import org.app.mintonmatchapi.match.notification.PostAutoFinishNotifier;
 import org.app.mintonmatchapi.match.dto.*;
 import org.app.mintonmatchapi.match.entity.Match;
 import org.app.mintonmatchapi.match.entity.MatchParticipant;
@@ -11,10 +14,11 @@ import org.app.mintonmatchapi.match.entity.MatchStatus;
 import org.app.mintonmatchapi.match.entity.ParticipantStatus;
 import org.app.mintonmatchapi.match.repository.MatchParticipantRepository;
 import org.app.mintonmatchapi.match.repository.MatchRepository;
+import org.app.mintonmatchapi.review.service.ReviewService;
 import org.app.mintonmatchapi.user.entity.User;
 import org.app.mintonmatchapi.user.repository.UserRepository;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,10 +31,10 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 import static org.app.mintonmatchapi.match.entity.ParticipantStatus.ACCEPTED;
-import static org.app.mintonmatchapi.match.entity.ParticipantStatus.PENDING;
 import static org.app.mintonmatchapi.match.entity.ParticipantStatus.RESERVED;
 import static org.app.mintonmatchapi.match.entity.ParticipantStatus.WAITING;
 
+@Slf4j
 @Service
 public class MatchService {
 
@@ -38,13 +42,22 @@ public class MatchService {
     private final MatchParticipantRepository matchParticipantRepository;
     private final UserRepository userRepository;
     private final QueueProperties queueProperties;
+    private final MatchProperties matchProperties;
+    private final ObjectProvider<PostAutoFinishNotifier> postAutoFinishNotifier;
+    private final ReviewService reviewService;
 
     public MatchService(MatchRepository matchRepository, MatchParticipantRepository matchParticipantRepository,
-                       UserRepository userRepository, QueueProperties queueProperties) {
+                       UserRepository userRepository, QueueProperties queueProperties,
+                       MatchProperties matchProperties,
+                       ObjectProvider<PostAutoFinishNotifier> postAutoFinishNotifier,
+                       ReviewService reviewService) {
         this.matchRepository = matchRepository;
         this.matchParticipantRepository = matchParticipantRepository;
         this.userRepository = userRepository;
         this.queueProperties = queueProperties;
+        this.matchProperties = matchProperties;
+        this.postAutoFinishNotifier = postAutoFinishNotifier;
+        this.reviewService = reviewService;
     }
 
     @Transactional
@@ -122,6 +135,8 @@ public class MatchService {
                 .confirmedParticipants(accepted.stream().map(ParticipantSummary::from).collect(Collectors.toList()))
                 .waitingList(waiting.stream().map(ParticipantSummary::from).collect(Collectors.toList()))
                 .waitingCount(waiting.size())
+                .canFinishMatch(computeCanFinishMatch(match, userId))
+                .reviewPendingUserIds(reviewService.listPendingRevieweeIds(match, userId, accepted))
                 .serverTime(Instant.now().toString())
                 .isEmergencyMode(match.isWithinEmergencyThreshold(LocalDateTime.now().plusHours(queueProperties.getEmergencyThresholdHours())));
 
@@ -154,6 +169,22 @@ public class MatchService {
 
     private Boolean resolveCanCancel(MatchParticipant myParticipation) {
         return myParticipation != null && myParticipation.getStatus().isActiveParticipation();
+    }
+
+    private boolean computeCanFinishMatch(Match match, Long userId) {
+        if (userId == null || !match.getHost().getId().equals(userId)) {
+            return false;
+        }
+        if (match.getStatus() != MatchStatus.CLOSED) {
+            return false;
+        }
+        if (matchProperties.isRequirePastStartForManualFinish()) {
+            LocalDateTime matchStart = match.getMatchDate().atTime(match.getStartTime());
+            if (matchStart.isAfter(LocalDateTime.now())) {
+                return false;
+            }
+        }
+        return true;
     }
 
     public Page<MatchListResponse> getMatchList(MatchSearchCondition condition, Long userId) {
@@ -195,7 +226,16 @@ public class MatchService {
             throw new BusinessException(ErrorCode.FORBIDDEN, "방장만 매칭을 수정할 수 있습니다.");
         }
 
+        if (request.getStatus() != null && request.getStatus() != MatchStatus.CLOSED) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST,
+                    "status는 모집 마감 시 CLOSED만 지정할 수 있습니다.");
+        }
+        boolean wantsClose = request.getStatus() == MatchStatus.CLOSED;
+
         if (match.getStatus() != MatchStatus.RECRUITING) {
+            if (wantsClose && match.getStatus() == MatchStatus.CLOSED) {
+                return MatchResponse.from(match);
+            }
             throw new BusinessException(ErrorCode.MATCH_NOT_RECRUITING, "모집 중인 매칭만 수정할 수 있습니다.");
         }
 
@@ -237,8 +277,89 @@ public class MatchService {
                 request.getLongitude()
         );
 
+        if (wantsClose) {
+            match.markClosed();
+        }
+
         Match saved = matchRepository.save(match);
         return MatchResponse.from(saved);
+    }
+
+    /**
+     * 방장이 매칭을 수동 종료한다. 전제: CLOSED, (선택) 경기 시작 시각 경과.
+     */
+    @Transactional
+    public MatchResponse finishMatch(Long hostUserId, Long matchId) {
+        Match match = matchRepository.findByIdWithHostForUpdate(matchId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.MATCH_NOT_FOUND));
+
+        if (!match.getHost().getId().equals(hostUserId)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "방장만 매칭을 종료할 수 있습니다.");
+        }
+
+        if (match.getStatus() != MatchStatus.CLOSED) {
+            throw new BusinessException(ErrorCode.INVALID_MATCH_STATUS,
+                    "모집 마감(CLOSED) 상태의 매칭만 종료할 수 있습니다. 현재 상태: " + match.getStatus());
+        }
+
+        if (matchProperties.isRequirePastStartForManualFinish()) {
+            LocalDateTime matchStart = match.getMatchDate().atTime(match.getStartTime());
+            if (matchStart.isAfter(LocalDateTime.now())) {
+                throw new BusinessException(ErrorCode.INVALID_MATCH_STATUS,
+                        "경기 시작 시각 이후에만 수동 종료할 수 있습니다.");
+            }
+        }
+
+        match.markFinished();
+        Match finished = matchRepository.save(match);
+        return MatchResponse.from(finished);
+    }
+
+    /**
+     * 방장이 매칭을 취소한다. RECRUITING·CLOSED만 가능. FINISHED·이미 CANCELLED는 불가(취소된 건 멱등 응답).
+     */
+    @Transactional
+    public MatchResponse cancelMatch(Long hostUserId, Long matchId) {
+        Match match = matchRepository.findByIdWithHostForUpdate(matchId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.MATCH_NOT_FOUND));
+
+        if (!match.getHost().getId().equals(hostUserId)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "방장만 매칭을 취소할 수 있습니다.");
+        }
+
+        if (match.getStatus() == MatchStatus.CANCELLED) {
+            return MatchResponse.from(match);
+        }
+        if (match.getStatus() == MatchStatus.FINISHED) {
+            throw new BusinessException(ErrorCode.INVALID_MATCH_STATUS,
+                    "종료된 매칭은 취소할 수 없습니다.");
+        }
+        if (match.getStatus() != MatchStatus.RECRUITING && match.getStatus() != MatchStatus.CLOSED) {
+            throw new BusinessException(ErrorCode.INVALID_MATCH_STATUS,
+                    "취소할 수 없는 상태입니다: " + match.getStatus());
+        }
+
+        match.markCancelled();
+        Match saved = matchRepository.save(match);
+        return MatchResponse.from(saved);
+    }
+
+    /**
+     * CLOSED 매칭 중 경기 시작 후 {@link MatchProperties#getAutoFinishAfterStartHours()}시간이 지난 건을 FINISHED로 전환한다.
+     */
+    @Transactional
+    public long autoFinishMatches() {
+        int hours = matchProperties.getAutoFinishAfterStartHours();
+        LocalDateTime cutoff = LocalDateTime.now().minusHours(hours);
+        List<Long> ids = matchRepository.findClosedMatchIdsStartedOnOrBefore(cutoff);
+        if (ids.isEmpty()) {
+            log.debug("자동 종료 대상 없음 (cutoff={})", cutoff);
+            return 0L;
+        }
+        long updated = matchRepository.bulkMarkFinishedByIds(ids);
+        log.info("매칭 자동 종료: {}건, matchIds={}, cutoff={}", updated, ids, cutoff);
+        postAutoFinishNotifier.ifAvailable(n -> n.onMatchesAutoFinished(ids));
+        return updated;
     }
 
     private void validateMatchDateTime(LocalDate matchDate, LocalTime startTime) {

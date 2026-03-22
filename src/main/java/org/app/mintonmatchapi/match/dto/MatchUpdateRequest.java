@@ -5,6 +5,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.app.mintonmatchapi.match.entity.CostPolicy;
+import org.app.mintonmatchapi.match.entity.MatchStatus;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -17,6 +18,11 @@ import java.time.LocalTime;
 @Setter
 @NoArgsConstructor
 public class MatchUpdateRequest {
+
+    /**
+     * 모집 마감 시 {@code CLOSED}만 허용. 미전달 시 상태 변경 없음.
+     */
+    private MatchStatus status;
 
     @Size(max = 100, message = "제목은 100자 이하여야 합니다.")
     private String title;

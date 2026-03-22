@@ -159,4 +159,25 @@ public class Match extends BaseEntity {
             this.longitude = longitude;
         }
     }
+
+    /**
+     * 모집 중(RECRUITING) 매칭을 모집 마감(CLOSED)로 전환한다. 호출 전 권한·상태 검증은 서비스에서 수행한다.
+     */
+    public void markClosed() {
+        this.status = MatchStatus.CLOSED;
+    }
+
+    /**
+     * 모집 마감(CLOSED) 매칭을 종료(FINISHED)로 표시한다. 호출 전 상태·권한 검증은 서비스에서 수행한다.
+     */
+    public void markFinished() {
+        this.status = MatchStatus.FINISHED;
+    }
+
+    /**
+     * 매칭을 취소(CANCELLED)로 표시한다. 호출 전 권한·상태 검증은 서비스에서 수행한다.
+     */
+    public void markCancelled() {
+        this.status = MatchStatus.CANCELLED;
+    }
 }

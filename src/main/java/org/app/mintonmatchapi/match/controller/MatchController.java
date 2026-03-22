@@ -83,6 +83,27 @@ public class MatchController {
         return ApiResponse.success(response);
     }
 
+    @PatchMapping("/{matchId}/finish")
+    public ApiResponse<MatchResponse> finishMatch(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @PathVariable Long matchId) {
+        Long hostUserId = AuthUtils.getUserIdOrThrow(principal);
+        MatchResponse response = matchService.finishMatch(hostUserId, matchId);
+        return ApiResponse.success(response);
+    }
+
+    /**
+     * PATCH 권장. 일부 클라이언트/프록시에서 PATCH가 매핑되지 않는 경우를 위해 POST도 동일 동작으로 허용.
+     */
+    @RequestMapping(value = "/{matchId}/cancel", method = {RequestMethod.PATCH, RequestMethod.POST})
+    public ApiResponse<MatchResponse> cancelMatch(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @PathVariable Long matchId) {
+        Long hostUserId = AuthUtils.getUserIdOrThrow(principal);
+        MatchResponse response = matchService.cancelMatch(hostUserId, matchId);
+        return ApiResponse.success(response);
+    }
+
     @GetMapping("/{matchId}")
     public ApiResponse<MatchDetailResponse> getMatchDetail(
             @IfLogin UserPrincipal principal,

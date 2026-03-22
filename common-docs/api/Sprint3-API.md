@@ -23,6 +23,7 @@
 | 메서드 | 경로 | 인증 | 설명 |
 |--------|------|------|------|
 | PATCH | /api/matches/{matchId} | **필요** | 매칭 수정 (방장, 모집 중만) |
+| PATCH 또는 POST | /api/matches/{matchId}/cancel | **필요** | **모임 취소** (방장, RECRUITING·CLOSED → CANCELLED). POST는 PATCH가 환경에서 매핑되지 않을 때 대안 |
 | POST | /api/matches/{matchId}/participants | **필요** | 참여/대기 신청 |
 | PATCH | /api/matches/{matchId}/participants/{participationId} | **필요** | 방장 수락/거절/추방 |
 | DELETE | /api/matches/{matchId}/participants/me | **필요** | 참여 취소 |
@@ -360,6 +361,7 @@ RESERVED 상태인 본인이 참석 기회를 거절합니다. 대기 상태 해
 
 | 필드 | 타입 | 필수 | 설명 |
 |------|------|------|------|
+| status | MatchStatus | X | **`CLOSED`만** 허용. RECRUITING → CLOSED(모집 마감). 이미 CLOSED면 동일 요청 시 멱등(200). 그 외 값은 `BAD_REQUEST` |
 | title | String | X | 제목 (최대 100자, 비워둘 수 없음) |
 | description | String | X | 상세 설명 (비워둘 수 없음) |
 | matchDate | LocalDate | X | 경기 날짜 (yyyy-MM-dd, 오늘 이후) |
@@ -417,7 +419,29 @@ RESERVED 상태인 본인이 참석 기회를 거절합니다. 대기 상태 해
 | MATCH_NOT_FOUND | 404 | 매칭 없음 |
 | FORBIDDEN | 403 | 방장이 아님 |
 | MATCH_NOT_RECRUITING | 400 | 모집 중 아님 (CLOSED, CANCELLED 등) |
-| BAD_REQUEST | 400 | 정원을 현재 확정 인원보다 낮게 수정 시도 / 제목·설명 비움 / 날짜·시간 유효성 위반 |
+| BAD_REQUEST | 400 | 정원을 현재 확정 인원보다 낮게 수정 시도 / 제목·설명 비움 / 날짜·시간 유효성 위반 / `status`에 CLOSED 외 값 |
+
+**모임 취소는 `PATCH` 본문의 `status: CANCELLED`가 아니라 전용 API를 사용합니다.**
+
+### 7-1. 모임 취소 (매칭 CANCELLED)
+
+**PATCH** 또는 **POST** `/api/matches/{matchId}/cancel`
+
+방장이 모임 전체를 취소합니다. Request body 없음. (동일 서버에서 **POST**도 같은 처리로 허용)
+
+| 전제 | 설명 |
+|------|------|
+| 권한 | 방장만 |
+| 허용 상태 | **RECRUITING**, **CLOSED** |
+| 불가 | **FINISHED**, 그 외 |
+| 멱등 | 이미 **CANCELLED**이면 200·동일 응답 |
+
+**에러**
+
+| 코드 | 설명 |
+|------|------|
+| INVALID_MATCH_STATUS | 종료(FINISHED) 후 취소 시도 등 |
+| FORBIDDEN | 방장 아님 |
 
 ---
 

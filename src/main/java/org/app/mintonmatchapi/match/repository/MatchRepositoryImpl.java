@@ -7,18 +7,24 @@ import org.app.mintonmatchapi.match.dto.MatchSearchCondition;
 import org.app.mintonmatchapi.match.entity.Match;
 import org.app.mintonmatchapi.match.entity.MatchStatus;
 import org.app.mintonmatchapi.match.entity.QMatch;
+import jakarta.persistence.EntityManager;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.support.PageableExecutionUtils;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.List;
 
 public class MatchRepositoryImpl implements MatchRepositoryCustom {
 
     private final JPAQueryFactory queryFactory;
+    private final EntityManager entityManager;
 
-    public MatchRepositoryImpl(JPAQueryFactory queryFactory) {
+    public MatchRepositoryImpl(JPAQueryFactory queryFactory, EntityManager entityManager) {
         this.queryFactory = queryFactory;
+        this.entityManager = entityManager;
     }
 
     @Override
@@ -84,5 +90,48 @@ public class MatchRepositoryImpl implements MatchRepositoryCustom {
 
     private BooleanExpression statusRecruitingOrClosed(QMatch match) {
         return match.status.in(MatchStatus.RECRUITING, MatchStatus.CLOSED);
+    }
+
+    @Override
+    public List<Long> findClosedMatchIdsStartedOnOrBefore(LocalDateTime cutoff) {
+        QMatch match = QMatch.match;
+        return queryFactory
+                .select(match.id)
+                .from(match)
+                .where(
+                        match.status.eq(MatchStatus.CLOSED),
+                        matchStartOnOrBefore(match, cutoff))
+                .fetch();
+    }
+
+    @Override
+    public long bulkMarkFinishedByIds(List<Long> matchIds) {
+        if (matchIds == null || matchIds.isEmpty()) {
+            return 0L;
+        }
+        QMatch match = QMatch.match;
+        LocalDateTime now = LocalDateTime.now();
+        long updated = queryFactory
+                .update(match)
+                .set(match.status, MatchStatus.FINISHED)
+                .set(match.updatedAt, now)
+                .where(match.id.in(matchIds))
+                .execute();
+        // 벌크 UPDATE는 영속성 컨텍스트를 갱신하지 않음 → 동일 TX 후속 조회 시 stale 방지
+        if (updated > 0) {
+            entityManager.flush();
+            entityManager.clear();
+        }
+        return updated;
+    }
+
+    /**
+     * matchDate.atTime(startTime) &lt;= cutoff 와 동일 (LocalDate/LocalTime 기준).
+     */
+    private BooleanExpression matchStartOnOrBefore(QMatch match, LocalDateTime cutoff) {
+        LocalDate cutoffDate = cutoff.toLocalDate();
+        LocalTime cutoffTime = cutoff.toLocalTime();
+        return match.matchDate.lt(cutoffDate)
+                .or(match.matchDate.eq(cutoffDate).and(match.startTime.loe(cutoffTime)));
     }
 }

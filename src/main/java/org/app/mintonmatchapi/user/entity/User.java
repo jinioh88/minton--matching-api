@@ -7,6 +7,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.app.mintonmatchapi.common.entity.BaseEntity;
 
+import java.time.LocalDateTime;
+
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Entity
@@ -58,6 +60,19 @@ public class User extends BaseEntity {
     @Column(name = "penalty_count", nullable = false)
     private Integer penaltyCount = 0;
 
+    @Column(name = "participation_banned_until")
+    private LocalDateTime participationBannedUntil;
+
+    @Column(name = "suspended_until")
+    private LocalDateTime suspendedUntil;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "account_status", nullable = false, length = 20)
+    private AccountStatus accountStatus = AccountStatus.ACTIVE;
+
+    @Column(name = "penalty_points", nullable = false)
+    private Integer penaltyPoints = 0;
+
     @Builder
     public User(Provider provider, String providerId, String email, String nickname,
                 String profileImg, Level level, String interestLoc1, String interestLoc2,
@@ -84,5 +99,48 @@ public class User extends BaseEntity {
         if (interestLoc2 != null) this.interestLoc2 = interestLoc2;
         if (racketInfo != null) this.racketInfo = racketInfo;
         if (playStyle != null) this.playStyle = playStyle;
+    }
+
+    /**
+     * 후기 가중 평점 갱신 결과를 반영한다.
+     */
+    public void updateRatingScore(float newRatingScore) {
+        this.ratingScore = newRatingScore;
+    }
+
+    public void recordPenaltyGrant(int penaltyWeightDelta) {
+        int pc = penaltyCount != null ? penaltyCount : 0;
+        this.penaltyCount = pc + 1;
+        int pts = penaltyPoints != null ? penaltyPoints : 0;
+        this.penaltyPoints = pts + penaltyWeightDelta;
+    }
+
+    /** 더 늦은(긴) 제한 종료 시각을 유지한다. */
+    public void mergeParticipationBannedUntil(LocalDateTime candidateEnd) {
+        if (candidateEnd == null) {
+            return;
+        }
+        if (participationBannedUntil == null || candidateEnd.isAfter(participationBannedUntil)) {
+            this.participationBannedUntil = candidateEnd;
+        }
+    }
+
+    public void mergeSuspendedUntil(LocalDateTime candidateEnd) {
+        if (candidateEnd == null) {
+            return;
+        }
+        if (suspendedUntil == null || candidateEnd.isAfter(suspendedUntil)) {
+            this.suspendedUntil = candidateEnd;
+        }
+    }
+
+    public void markBanned() {
+        this.accountStatus = AccountStatus.BANNED;
+    }
+
+    public void markSuspendedIfNotBanned() {
+        if (this.accountStatus != AccountStatus.BANNED) {
+            this.accountStatus = AccountStatus.SUSPENDED;
+        }
     }
 }

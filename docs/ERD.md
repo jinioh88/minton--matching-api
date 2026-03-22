@@ -120,9 +120,9 @@ rating_score
 
 FLOAT
 
-Default 5.0
+Default 0
 
-매너/실력 평균 점수
+매너/실력 표시 점수(무후기 0, 후기 반영 시 갱신 — `docs/요구사항분석.md`)
 
 penalty_count
 
@@ -130,7 +130,39 @@ INT
 
 Default 0
 
-노쇼/지각 누적 횟수
+노쇼/지각 등 부여 **건수**(스트라이크 집계에 사용, 유형별 가중치 도입 시 `penalty_points`와 병행 가능)
+
+penalty_points
+
+INT
+
+Default 0
+
+(선택) 유형별 가중치 합산용 — 단계별 제재 판정에 사용할 경우
+
+participation_banned_until
+
+DATETIME
+
+NULL 허용
+
+이 시각 이전까지 **매칭 참여 신청(Apply) 불가**(단계별 제재·제한 단계). `docs/요구사항분석.md` 제재 정책
+
+suspended_until
+
+DATETIME
+
+NULL 허용
+
+이 시각 이전까지 **넓은 기능 제한**(정지 단계). 로그인만 허용 등 정책과 연동
+
+account_status
+
+VARCHAR 또는 ENUM
+
+Default ACTIVE
+
+ACTIVE, SUSPENDED, BANNED 등 — 퇴출·영구 정지 시
 
 created_at
 
@@ -468,8 +500,12 @@ UPDATE MatchParticipants SET status = 'ACCEPTED' WHERE participation_id = ?
 
 이후 Matches.current_people 카운트 +1 처리.
 
-노쇼 페널티 반영
+노쇼·지각 패널티 반영
 
-UPDATE Users SET penalty_count = penalty_count + 1 WHERE user_id = ?
+Penalties 행 INSERT 후 Users.penalty_count(및 선택 penalty_points) 갱신.
 
-rating_score를 재계산하여 업데이트.
+단계별 제재에 따라 participation_banned_until, suspended_until, account_status 갱신(`docs/요구사항분석.md`).
+
+참여 신청 API에서는 participation_banned_until > now 이면 거절.
+
+rating_score는 후기 도메인에서 별도 갱신(패널티와 직접 연동은 선택).

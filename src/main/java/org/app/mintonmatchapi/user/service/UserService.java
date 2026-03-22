@@ -4,6 +4,8 @@ import org.app.mintonmatchapi.common.exception.BusinessException;
 import org.app.mintonmatchapi.common.exception.ErrorCode;
 import org.app.mintonmatchapi.file.dto.FileUploadType;
 import org.app.mintonmatchapi.file.service.S3Service;
+import org.app.mintonmatchapi.penalty.config.SanctionProperties;
+import org.app.mintonmatchapi.review.repository.ReviewRepository;
 import org.app.mintonmatchapi.user.dto.NicknameCheckResponse;
 import org.app.mintonmatchapi.user.dto.ProfileResponse;
 import org.app.mintonmatchapi.user.dto.ProfileUpdateRequest;
@@ -20,10 +22,15 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final S3Service s3Service;
+    private final ReviewRepository reviewRepository;
+    private final SanctionProperties sanctionProperties;
 
-    public UserService(UserRepository userRepository, S3Service s3Service) {
+    public UserService(UserRepository userRepository, S3Service s3Service,
+                       ReviewRepository reviewRepository, SanctionProperties sanctionProperties) {
         this.userRepository = userRepository;
         this.s3Service = s3Service;
+        this.reviewRepository = reviewRepository;
+        this.sanctionProperties = sanctionProperties;
     }
 
     public NicknameCheckResponse checkNickname(String nickname) {
@@ -38,7 +45,7 @@ public class UserService {
 
     public ProfileResponse getMyProfile(Long userId) {
         User user = findUserById(userId);
-        return ProfileResponse.ofMe(user);
+        return toProfileMe(user);
     }
 
     @Transactional
@@ -57,7 +64,7 @@ public class UserService {
                 request.getPlayStyle()
         );
 
-        return ProfileResponse.ofMe(user);
+        return toProfileMe(user);
     }
 
     @Transactional
@@ -88,12 +95,28 @@ public class UserService {
             throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "프로필 이미지 업로드 중 오류가 발생했습니다.");
         }
 
-        return ProfileResponse.ofMe(user);
+        return toProfileMe(user);
     }
 
     public ProfileResponse getUserProfile(Long userId) {
         User user = findUserById(userId);
-        return ProfileResponse.ofOther(user);
+        return toProfileOther(user);
+    }
+
+    private ProfileResponse toProfileMe(User user) {
+        return ProfileResponse.ofMe(user, receivedReviewCount(user.getId()), participationBanStrikeThreshold());
+    }
+
+    private ProfileResponse toProfileOther(User user) {
+        return ProfileResponse.ofOther(user, receivedReviewCount(user.getId()), participationBanStrikeThreshold());
+    }
+
+    private long receivedReviewCount(Long userId) {
+        return reviewRepository.countByReviewee_Id(userId);
+    }
+
+    private int participationBanStrikeThreshold() {
+        return sanctionProperties.getStrikeThresholds().getParticipationBan();
     }
 
     private User findUserById(Long userId) {

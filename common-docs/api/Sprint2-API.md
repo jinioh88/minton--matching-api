@@ -310,7 +310,9 @@
     "myParticipation": null,
     "canApply": true,
     "canCancel": false,
-    "hasWaitingOffer": false
+    "hasWaitingOffer": false,
+    "canFinishMatch": false,
+    "reviewPendingUserIds": []
   }
 }
 ```
@@ -323,6 +325,13 @@
 | canApply | Boolean | 참여 신청 가능 여부 |
 | canCancel | Boolean | 취소 가능 여부 |
 | hasWaitingOffer | Boolean | 예약 수락 대기 여부 (RESERVED) |
+
+**Sprint 4 추가 필드** (항상 포함, 비로그인 시에도)
+
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| canFinishMatch | boolean | [모임 종료] 가능 여부. 방장·CLOSED·수동 종료 시각 조건과 `PATCH .../finish` 판정 일치. |
+| reviewPendingUserIds | Long[] | 종료된 매칭에서 로그인 사용자가 확정 참여자일 때, 본인이 아직 후기를 쓰지 않은 대상 `userId` 목록. 상세는 [Sprint4-API.md](./Sprint4-API.md). |
 
 ---
 

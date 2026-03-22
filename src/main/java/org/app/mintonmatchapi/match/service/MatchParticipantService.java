@@ -16,6 +16,7 @@ import org.app.mintonmatchapi.match.event.ParticipantCancelledEvent;
 import org.app.mintonmatchapi.match.repository.MatchParticipantRepository;
 import org.app.mintonmatchapi.match.repository.MatchRepository;
 import org.app.mintonmatchapi.user.entity.User;
+import org.app.mintonmatchapi.user.policy.ParticipationEligibility;
 import org.app.mintonmatchapi.user.repository.UserRepository;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
@@ -78,6 +79,7 @@ public class MatchParticipantService {
 
         User user = userRepository.findById(currentUserId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "사용자를 찾을 수 없습니다."));
+        ParticipationEligibility.assertMayApplyToMatch(user);
 
         long acceptedCount = matchParticipantRepository.countByMatchIdAndStatus(matchId, ACCEPTED);
         String applyMessage = StringUtils.trimOrNull(request != null ? request.getApplyMessage() : null);

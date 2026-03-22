@@ -2,6 +2,10 @@ spring:
   application:
     name: minton-match-api
 
+  # Flyway는 운영(prod)에서만 켠다. 로컬은 Hibernate ddl-auto(update)로 스키마 반영.
+  flyway:
+    enabled: false
+
   # 프로파일: local(로컬/H2), prod(운영/MySQL)
   # 기본값 local - 프로파일 미지정 시 로컬 환경 사용
   profiles:
@@ -26,6 +30,31 @@ jwt:
 # OAuth2 Redirect URI 허용 목록
 # Flutter 앱, React 웹 등 클라이언트별 redirect URI를 등록
 # Request의 redirectUri가 이 목록에 있는지 검증 후 토큰 교환 진행
+
+# 매칭 종료 (Sprint 4): 경기 시작 후 N시간 경과한 CLOSED → FINISHED 자동 전환, 수동 종료 API
+match:
+  auto-finish-after-start-hours: 10
+  auto-finish-cron: "0 0 * * * *"
+  require-past-start-for-manual-finish: true
+
+# 후기·평점 가중 갱신 (docs/요구사항분석.md)
+review:
+  rating-prior-count: 10
+  rating-prior-mean: 5.0
+  reveal-after-finish-hours: 72
+
+# 패널티·단계별 제재 (docs/Sprint4-할일.md Step 6)
+sanction:
+  strike-thresholds:
+    participation-ban: 3
+    full-suspension: 5
+    permanent-ban: 10
+  durations:
+    participation-ban-days: 3
+    suspension-days: 7
+  penalty-weights:
+    NO_SHOW: 2
+    LATE: 1
 
 # 대기열 하이브리드 시스템 설정
 queue:

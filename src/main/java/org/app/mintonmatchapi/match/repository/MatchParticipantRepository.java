@@ -16,6 +16,8 @@ import org.springframework.data.domain.Pageable;
 
 public interface MatchParticipantRepository extends JpaRepository<MatchParticipant, Long> {
 
+    boolean existsByMatch_IdAndUser_IdAndStatus(Long matchId, Long userId, ParticipantStatus status);
+
     @Query("SELECT mp FROM MatchParticipant mp JOIN FETCH mp.user WHERE mp.match.id = :matchId AND mp.status IN :statuses ORDER BY mp.status ASC, mp.queueOrder ASC")
     List<MatchParticipant> findByMatchIdAndStatusInWithUserOrderByQueueOrderAsc(@Param("matchId") Long matchId, @Param("statuses") List<ParticipantStatus> statuses);
 
