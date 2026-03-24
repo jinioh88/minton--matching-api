@@ -13,6 +13,10 @@ import org.app.mintonmatchapi.match.entity.MatchParticipant;
 import org.app.mintonmatchapi.match.entity.MatchStatus;
 import org.app.mintonmatchapi.match.entity.ParticipantStatus;
 import org.app.mintonmatchapi.match.event.ParticipantCancelledEvent;
+import org.app.mintonmatchapi.chat.service.ChatRoomService;
+import org.app.mintonmatchapi.notification.entity.NotificationType;
+import org.app.mintonmatchapi.notification.event.NotificationDispatchCommand;
+import org.app.mintonmatchapi.notification.service.NotificationService;
 import org.app.mintonmatchapi.match.repository.MatchParticipantRepository;
 import org.app.mintonmatchapi.match.repository.MatchRepository;
 import org.app.mintonmatchapi.user.entity.User;
@@ -24,7 +28,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Optional;
 
 import static org.app.mintonmatchapi.match.entity.ParticipantStatus.ACCEPTED;
 import static org.app.mintonmatchapi.match.entity.ParticipantStatus.PENDING;
@@ -39,17 +42,23 @@ public class MatchParticipantService {
     private final UserRepository userRepository;
     private final ApplicationEventPublisher eventPublisher;
     private final QueueProperties queueProperties;
+    private final ChatRoomService chatRoomService;
+    private final NotificationService notificationService;
 
     public MatchParticipantService(MatchRepository matchRepository,
                                   MatchParticipantRepository matchParticipantRepository,
                                   UserRepository userRepository,
                                   ApplicationEventPublisher eventPublisher,
-                                  QueueProperties queueProperties) {
+                                  QueueProperties queueProperties,
+                                  ChatRoomService chatRoomService,
+                                  NotificationService notificationService) {
         this.matchRepository = matchRepository;
         this.matchParticipantRepository = matchParticipantRepository;
         this.userRepository = userRepository;
         this.eventPublisher = eventPublisher;
         this.queueProperties = queueProperties;
+        this.chatRoomService = chatRoomService;
+        this.notificationService = notificationService;
     }
 
     @Transactional
@@ -109,6 +118,15 @@ public class MatchParticipantService {
                     .build();
             saved = matchParticipantRepository.save(participant);
         }
+        String matchTitle = NotificationService.truncateTitle(match.getTitle());
+        String nick = displayNickname(user);
+        notificationService.publishAfterCommit(NotificationDispatchCommand.of(
+                match.getHost().getId(),
+                NotificationType.MATCH_APPLICATION,
+                "새 참여 신청",
+                String.format("'%s' 매칭에 %s님이 신청했습니다.", matchTitle, nick),
+                matchId,
+                saved.getId()));
         return ParticipantApplyResponse.from(saved);
     }
 
@@ -151,6 +169,25 @@ public class MatchParticipantService {
         }
 
         MatchParticipant saved = matchParticipantRepository.save(participant);
+        String matchTitle = NotificationService.truncateTitle(match.getTitle());
+        if (action == ParticipantDecisionRequest.ParticipantDecisionAction.ACCEPT) {
+            chatRoomService.ensureChatRoomForMatch(matchId);
+            notificationService.publishAfterCommit(NotificationDispatchCommand.of(
+                    saved.getUser().getId(),
+                    NotificationType.PARTICIPATION_ACCEPTED,
+                    "참여가 확정되었습니다",
+                    String.format("'%s' 매칭 신청이 수락되었습니다.", matchTitle),
+                    matchId,
+                    saved.getId()));
+        } else if (action == ParticipantDecisionRequest.ParticipantDecisionAction.REJECT) {
+            notificationService.publishAfterCommit(NotificationDispatchCommand.of(
+                    saved.getUser().getId(),
+                    NotificationType.PARTICIPATION_REJECTED,
+                    "참여 신청 결과",
+                    String.format("'%s' 매칭 신청이 거절되었습니다.", matchTitle),
+                    matchId,
+                    saved.getId()));
+        }
         return ParticipantApplyResponse.from(saved);
     }
 
@@ -194,6 +231,15 @@ public class MatchParticipantService {
 
         participant.changeToAccepted();
         MatchParticipant saved = matchParticipantRepository.save(participant);
+        chatRoomService.ensureChatRoomForMatch(matchId);
+        String matchTitle = NotificationService.truncateTitle(match.getTitle());
+        notificationService.publishAfterCommit(NotificationDispatchCommand.of(
+                userId,
+                NotificationType.PARTICIPATION_ACCEPTED,
+                "참여가 확정되었습니다",
+                String.format("'%s' 매칭에 확정되었습니다. 예약을 수락했습니다.", matchTitle),
+                matchId,
+                saved.getId()));
         return ParticipantApplyResponse.from(saved);
     }
 
@@ -229,5 +275,10 @@ public class MatchParticipantService {
         eventPublisher.publishEvent(new ParticipantCancelledEvent(this, matchId, false, true));
 
         return ParticipantApplyResponse.from(saved);
+    }
+
+    private static String displayNickname(User user) {
+        String n = user.getNickname();
+        return (n != null && !n.isBlank()) ? n : "회원";
     }
 }

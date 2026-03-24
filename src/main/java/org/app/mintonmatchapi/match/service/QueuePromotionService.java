@@ -6,6 +6,9 @@ import org.app.mintonmatchapi.match.entity.MatchParticipant;
 import org.app.mintonmatchapi.match.entity.ParticipantStatus;
 import org.app.mintonmatchapi.match.repository.MatchParticipantRepository;
 import org.app.mintonmatchapi.match.repository.MatchRepository;
+import org.app.mintonmatchapi.notification.entity.NotificationType;
+import org.app.mintonmatchapi.notification.event.NotificationDispatchCommand;
+import org.app.mintonmatchapi.notification.service.NotificationService;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,13 +28,16 @@ public class QueuePromotionService {
     private final MatchParticipantRepository matchParticipantRepository;
     private final MatchRepository matchRepository;
     private final QueueProperties queueProperties;
+    private final NotificationService notificationService;
 
     public QueuePromotionService(MatchParticipantRepository matchParticipantRepository,
                                  MatchRepository matchRepository,
-                                 QueueProperties queueProperties) {
+                                 QueueProperties queueProperties,
+                                 NotificationService notificationService) {
         this.matchParticipantRepository = matchParticipantRepository;
         this.matchRepository = matchRepository;
         this.queueProperties = queueProperties;
+        this.notificationService = notificationService;
     }
 
     /**
@@ -78,13 +84,30 @@ public class QueuePromotionService {
         LocalDateTime expiresAt = LocalDateTime.now().plusMinutes(queueProperties.getOfferTimeoutMinutes());
         first.changeToReserved(expiresAt);
         matchParticipantRepository.save(first);
-        // TODO Sprint 5: 알림 발송 "참석 기회가 생겼습니다! 15분 내에 수락해 주세요."
+        int minutes = queueProperties.getOfferTimeoutMinutes();
+        String matchTitle = NotificationService.truncateTitle(match.getTitle());
+        notificationService.publishAfterCommit(NotificationDispatchCommand.of(
+                first.getUser().getId(),
+                NotificationType.WAITLIST_SLOT_OFFER,
+                "참석 기회 안내",
+                String.format("'%s' 매칭에 참석 기회가 생겼습니다. %d분 내에 수락해 주세요.", matchTitle, minutes),
+                matchId,
+                first.getId()));
     }
 
     private void promoteEmergency(Long matchId, Match match) {
-        // 긴급 모드: RESERVED 없이, accept-offer 호출 시 선착순으로 처리
-        // 여기서는 별도 승격 없음 - WAITING 전체가 accept-offer 호출 가능
-        // TODO Sprint 5: WAITING 전체에게 동시 알림
+        // 긴급 모드: RESERVED 없이, accept-offer 호출 시 선착순으로 처리 — WAITING 전체에 안내 알림
+        String matchTitle = NotificationService.truncateTitle(match.getTitle());
+        List<MatchParticipant> waiting = matchParticipantRepository.findByMatch_IdAndStatus(matchId, WAITING);
+        for (MatchParticipant p : waiting) {
+            notificationService.publishAfterCommit(NotificationDispatchCommand.of(
+                    p.getUser().getId(),
+                    NotificationType.WAITLIST_EMERGENCY_OPEN,
+                    "선착순 참가 안내",
+                    String.format("'%s' 매칭에 빈자리가 생겼습니다. 선착순으로 수락할 수 있습니다.", matchTitle),
+                    matchId,
+                    p.getId()));
+        }
     }
 
     /**

@@ -14,6 +14,8 @@ import org.app.mintonmatchapi.match.dto.MatchSearchCondition;
 import org.app.mintonmatchapi.match.dto.ParticipantApplicationResponse;
 import org.app.mintonmatchapi.match.dto.ParticipantApplyRequest;
 import org.app.mintonmatchapi.match.dto.ParticipantApplyResponse;
+import org.app.mintonmatchapi.chat.dto.ChatRoomDetailResponse;
+import org.app.mintonmatchapi.chat.service.ChatService;
 import org.app.mintonmatchapi.match.dto.ParticipantDecisionRequest;
 import org.app.mintonmatchapi.match.service.MatchParticipantService;
 import org.app.mintonmatchapi.match.service.MatchService;
@@ -34,10 +36,13 @@ public class MatchController {
 
     private final MatchService matchService;
     private final MatchParticipantService matchParticipantService;
+    private final ChatService chatService;
 
-    public MatchController(MatchService matchService, MatchParticipantService matchParticipantService) {
+    public MatchController(MatchService matchService, MatchParticipantService matchParticipantService,
+                          ChatService chatService) {
         this.matchService = matchService;
         this.matchParticipantService = matchParticipantService;
+        this.chatService = chatService;
     }
 
     @PostMapping
@@ -111,6 +116,14 @@ public class MatchController {
         Long userId = AuthUtils.getUserIdOrNull(principal);
         MatchDetailResponse response = matchService.getMatchDetail(matchId, userId);
         return ApiResponse.success(response);
+    }
+
+    @GetMapping("/{matchId}/chat")
+    public ApiResponse<ChatRoomDetailResponse> getMatchChat(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @PathVariable Long matchId) {
+        Long userId = AuthUtils.getUserIdOrThrow(principal);
+        return ApiResponse.success(chatService.getChatRoomDetailByMatchId(userId, matchId));
     }
 
     @PostMapping("/{matchId}/participants")

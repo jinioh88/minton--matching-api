@@ -34,7 +34,7 @@ public class GlobalExceptionHandler {
                 .map(error -> error.getField() + ": " + error.getDefaultMessage())
                 .collect(Collectors.joining(", "));
         log.warn("ValidationException: {}", message);
-        ErrorResponse response = ErrorResponse.of(ErrorCode.BAD_REQUEST, message);
+        ErrorResponse response = ErrorResponse.of(ErrorCode.VALIDATION_ERROR, message);
         return ResponseEntity.badRequest().body(response);
     }
 

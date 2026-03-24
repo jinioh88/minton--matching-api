@@ -30,6 +30,11 @@ public enum ErrorCode {
     USER_PARTICIPATION_BANNED(HttpStatus.BAD_REQUEST, "패널티 누적으로 참여가 제한되었습니다."),
     USER_SUSPENDED(HttpStatus.FORBIDDEN, "계정 정지 기간 중에는 이 작업을 할 수 없습니다."),
     USER_BANNED(HttpStatus.FORBIDDEN, "이용이 제한된 계정입니다."),
+    CHAT_ACCESS_DENIED(HttpStatus.FORBIDDEN, "채팅방에 접근할 권한이 없습니다."),
+    CHAT_ROOM_NOT_FOUND(HttpStatus.NOT_FOUND, "채팅방을 찾을 수 없습니다."),
+    MESSAGE_NOT_FOUND(HttpStatus.NOT_FOUND, "메시지를 찾을 수 없습니다."),
+    VALIDATION_ERROR(HttpStatus.BAD_REQUEST, "입력 값이 올바르지 않습니다."),
+    NOTIFICATION_NOT_FOUND(HttpStatus.NOT_FOUND, "알림을 찾을 수 없습니다."),
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "서버 오류가 발생했습니다.");
 
     private final HttpStatus status;

@@ -7,6 +7,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.app.mintonmatchapi.match.config.MatchProperties;
 import org.app.mintonmatchapi.match.config.QueueProperties;
 import org.app.mintonmatchapi.match.notification.PostAutoFinishNotifier;
+import org.app.mintonmatchapi.notification.entity.NotificationType;
+import org.app.mintonmatchapi.notification.event.NotificationDispatchCommand;
+import org.app.mintonmatchapi.notification.service.NotificationService;
 import org.app.mintonmatchapi.match.dto.*;
 import org.app.mintonmatchapi.match.entity.Match;
 import org.app.mintonmatchapi.match.entity.MatchParticipant;
@@ -45,12 +48,14 @@ public class MatchService {
     private final MatchProperties matchProperties;
     private final ObjectProvider<PostAutoFinishNotifier> postAutoFinishNotifier;
     private final ReviewService reviewService;
+    private final NotificationService notificationService;
 
     public MatchService(MatchRepository matchRepository, MatchParticipantRepository matchParticipantRepository,
                        UserRepository userRepository, QueueProperties queueProperties,
                        MatchProperties matchProperties,
                        ObjectProvider<PostAutoFinishNotifier> postAutoFinishNotifier,
-                       ReviewService reviewService) {
+                       ReviewService reviewService,
+                       NotificationService notificationService) {
         this.matchRepository = matchRepository;
         this.matchParticipantRepository = matchParticipantRepository;
         this.userRepository = userRepository;
@@ -58,6 +63,7 @@ public class MatchService {
         this.matchProperties = matchProperties;
         this.postAutoFinishNotifier = postAutoFinishNotifier;
         this.reviewService = reviewService;
+        this.notificationService = notificationService;
     }
 
     @Transactional
@@ -341,7 +347,31 @@ public class MatchService {
 
         match.markCancelled();
         Match saved = matchRepository.save(match);
+        notifyAcceptedParticipantsOnMatchCancelled(saved);
         return MatchResponse.from(saved);
+    }
+
+    /**
+     * B6-7: ACCEPTED 확정자에게만 알림. 방장 본인은 제외.
+     */
+    private void notifyAcceptedParticipantsOnMatchCancelled(Match match) {
+        Long hostId = match.getHost().getId();
+        Long matchId = match.getId();
+        String matchTitle = NotificationService.truncateTitle(match.getTitle());
+        List<MatchParticipant> accepted = matchParticipantRepository.findByMatch_IdAndStatus(matchId, ACCEPTED);
+        for (MatchParticipant p : accepted) {
+            Long uid = p.getUser().getId();
+            if (uid.equals(hostId)) {
+                continue;
+            }
+            notificationService.publishAfterCommit(NotificationDispatchCommand.of(
+                    uid,
+                    NotificationType.MATCH_CANCELLED,
+                    "모임이 취소되었습니다",
+                    String.format("방장이 '%s' 매칭을 취소했습니다.", matchTitle),
+                    matchId,
+                    p.getId()));
+        }
     }
 
     /**
