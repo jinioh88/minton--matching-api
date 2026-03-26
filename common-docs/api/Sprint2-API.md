@@ -205,7 +205,7 @@
 | regionCode | String | X | 지역 필터 (행정구역 코드). 단일 또는 다중(쉼표 구분) |
 | dateFrom | LocalDate | X | 시작 날짜 (yyyy-MM-dd) |
 | dateTo | LocalDate | X | 종료 날짜 (yyyy-MM-dd) |
-| level | String | X | 급수 필터 (targetLevels에 포함) |
+| level | String | X | 급수 필터. 쉼표로 여러 값 가능 (예: `B,C`). 각 토큰은 `A`·`B`·`C`·`D`·`BEGINNER`와 **완전 일치**할 때만 `targetLevels`와 매칭 (부분 문자열 매칭 아님 → `B`로 `BEGINNER` 오탐 없음). 공백은 trim, 대소문자 무시 |
 | page | int | X | 페이지 (기본 0) |
 | size | int | X | 페이지 크기 (기본 20) |
 
@@ -213,6 +213,7 @@
 
 - **비로그인**: regionCode 쿼리로 전달 또는 미전달 시 전체 목록
 - **로그인**: regionCode 미전달 시 interestLoc1/2를 기본 regionCode로 적용, query param으로 override 가능
+- **level**: `targetLevels`는 매칭 생성 시 저장한 쉼표 구분 문자열(예: `BEGINNER,D,C`)이다. 필터 값을 쉼표로 나눈 뒤 각 토큰을 허용 급수(`A`,`B`,`C`,`D`,`BEGINNER`)로 정규화·검증하고, 매칭의 `targetLevels` 안에서 **해당 급수가 독립 토큰으로 존재할 때만** 포함한다. 토큰이 여러 개면 **OR**(하나라도 일치하면 목록에 포함). 허용 목록에 없는 토큰은 무시한다(유효 토큰이 하나도 없으면 level 조건 없이 조회).
 
 **Response 예시**
 

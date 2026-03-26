@@ -1,12 +1,16 @@
 package org.app.mintonmatchapi.match.repository;
 
 import com.querydsl.core.types.dsl.BooleanExpression;
+import com.querydsl.core.types.dsl.StringPath;
 import com.querydsl.jpa.impl.JPAQuery;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import org.app.mintonmatchapi.match.dto.MatchSearchCondition;
 import org.app.mintonmatchapi.match.entity.Match;
 import org.app.mintonmatchapi.match.entity.MatchStatus;
+import org.app.mintonmatchapi.match.entity.ParticipantStatus;
 import org.app.mintonmatchapi.match.entity.QMatch;
+import org.app.mintonmatchapi.match.entity.QMatchParticipant;
+import org.app.mintonmatchapi.user.entity.Level;
 import jakarta.persistence.EntityManager;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -15,9 +19,17 @@ import org.springframework.data.support.PageableExecutionUtils;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 public class MatchRepositoryImpl implements MatchRepositoryCustom {
+
+    private static final Set<String> ALLOWED_LEVEL_TOKENS = EnumSet.allOf(Level.class).stream()
+            .map(Level::name)
+            .collect(Collectors.toUnmodifiableSet());
 
     private final JPAQueryFactory queryFactory;
     private final EntityManager entityManager;
@@ -81,15 +93,119 @@ public class MatchRepositoryImpl implements MatchRepositoryCustom {
         return QMatch.match.matchDate.loe(dateTo);
     }
 
+    /**
+     * 급수 필터: 요청 값은 쉼표로 구분, 각 토큰은 A|B|C|D|BEGINNER 과 완전 일치할 때만 매칭.
+     * (LIKE %B% 사용 시 BEGINNER 등에서 오탐 방지)
+     */
     private BooleanExpression levelContains(String level) {
         if (level == null || level.isBlank()) {
             return null;
         }
-        return QMatch.match.targetLevels.contains(level);
+        StringPath targetLevels = QMatch.match.targetLevels;
+        BooleanExpression combined = null;
+        for (String part : level.split(",")) {
+            String token = part.trim().toUpperCase(Locale.ROOT);
+            if (token.isEmpty() || !ALLOWED_LEVEL_TOKENS.contains(token)) {
+                continue;
+            }
+            BooleanExpression one = targetLevelsHasToken(targetLevels, token);
+            combined = combined == null ? one : combined.or(one);
+        }
+        return combined;
+    }
+
+    private static BooleanExpression targetLevelsHasToken(StringPath targetLevels, String token) {
+        return targetLevels.eq(token)
+                .or(targetLevels.startsWith(token + ","))
+                .or(targetLevels.contains("," + token + ","))
+                .or(targetLevels.endsWith("," + token));
     }
 
     private BooleanExpression statusRecruitingOrClosed(QMatch match) {
         return match.status.in(MatchStatus.RECRUITING, MatchStatus.CLOSED);
+    }
+
+    @Override
+    public Page<Match> searchHostedByUser(Long hostUserId, MatchStatus status, LocalDate dateFrom, LocalDate dateTo,
+                                        Pageable pageable) {
+        QMatch match = QMatch.match;
+        BooleanExpression where = match.host.id.eq(hostUserId);
+        if (status != null) {
+            where = where.and(match.status.eq(status));
+        }
+        BooleanExpression datePred = matchDateRange(match, dateFrom, dateTo);
+        if (datePred != null) {
+            where = where.and(datePred);
+        }
+
+        JPAQuery<Match> query = queryFactory
+                .selectFrom(match)
+                .leftJoin(match.host).fetchJoin()
+                .where(where)
+                .orderBy(match.matchDate.desc(), match.startTime.desc());
+
+        List<Match> content = query
+                .offset(pageable.getOffset())
+                .limit(pageable.getPageSize())
+                .fetch();
+
+        JPAQuery<Long> countQuery = queryFactory
+                .select(match.count())
+                .from(match)
+                .where(where);
+
+        return PageableExecutionUtils.getPage(content, pageable, countQuery::fetchOne);
+    }
+
+    @Override
+    public Page<Match> searchParticipatedByUser(Long userId, MatchStatus status, LocalDate dateFrom, LocalDate dateTo,
+                                                Pageable pageable) {
+        QMatch match = QMatch.match;
+        QMatchParticipant mp = QMatchParticipant.matchParticipant;
+
+        BooleanExpression where = mp.user.id.eq(userId)
+                .and(mp.status.eq(ParticipantStatus.ACCEPTED));
+        if (status != null) {
+            where = where.and(match.status.eq(status));
+        }
+        BooleanExpression datePred = matchDateRange(match, dateFrom, dateTo);
+        if (datePred != null) {
+            where = where.and(datePred);
+        }
+
+        JPAQuery<Match> query = queryFactory
+                .selectFrom(match)
+                .innerJoin(mp).on(mp.match.id.eq(match.id))
+                .leftJoin(match.host).fetchJoin()
+                .where(where)
+                .orderBy(match.matchDate.desc(), match.startTime.desc())
+                .distinct();
+
+        List<Match> content = query
+                .offset(pageable.getOffset())
+                .limit(pageable.getPageSize())
+                .fetch();
+
+        JPAQuery<Long> countQuery = queryFactory
+                .select(match.id.countDistinct())
+                .from(match)
+                .innerJoin(mp).on(mp.match.id.eq(match.id))
+                .where(where);
+
+        return PageableExecutionUtils.getPage(content, pageable, countQuery::fetchOne);
+    }
+
+    private BooleanExpression matchDateRange(QMatch match, LocalDate dateFrom, LocalDate dateTo) {
+        if (dateFrom == null && dateTo == null) {
+            return null;
+        }
+        if (dateFrom != null && dateTo != null) {
+            return match.matchDate.between(dateFrom, dateTo);
+        }
+        if (dateFrom != null) {
+            return match.matchDate.goe(dateFrom);
+        }
+        return match.matchDate.loe(dateTo);
     }
 
     @Override

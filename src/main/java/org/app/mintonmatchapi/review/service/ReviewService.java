@@ -9,9 +9,11 @@ import org.app.mintonmatchapi.match.entity.MatchStatus;
 import org.app.mintonmatchapi.match.repository.MatchParticipantRepository;
 import org.app.mintonmatchapi.match.repository.MatchRepository;
 import org.app.mintonmatchapi.review.config.ReviewProperties;
+import org.app.mintonmatchapi.review.dto.PendingReviewItemResponse;
 import org.app.mintonmatchapi.review.dto.ReviewCreateRequest;
 import org.app.mintonmatchapi.review.dto.ReviewListItemResponse;
 import org.app.mintonmatchapi.review.dto.ReviewResponse;
+import org.app.mintonmatchapi.review.dto.WrittenReviewListItemResponse;
 import org.app.mintonmatchapi.review.entity.Review;
 import org.app.mintonmatchapi.review.entity.ReviewHashtagCode;
 import org.app.mintonmatchapi.review.repository.ReviewRepository;
@@ -21,6 +23,7 @@ import org.app.mintonmatchapi.user.repository.UserRepository;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.support.PageableExecutionUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,8 +31,11 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import static org.app.mintonmatchapi.match.entity.ParticipantStatus.ACCEPTED;
 
@@ -170,6 +176,49 @@ public class ReviewService {
 
         Page<Review> page = reviewRepository.findPageWithRelationsByRevieweeId(revieweeId, pageable);
         return page.map(review -> ReviewListItemResponse.of(review, isContentRevealed(review, viewerUserId)));
+    }
+
+    /**
+     * 마이페이지 — 내가 작성한 후기 목록. 작성자 본인이므로 내용·상대 정보 항상 공개.
+     */
+    @Transactional(readOnly = true)
+    public Page<WrittenReviewListItemResponse> listMyWrittenReviews(Long reviewerId, Pageable pageable) {
+        return reviewRepository.findPageWithRelationsByReviewerId(reviewerId, pageable)
+                .map(WrittenReviewListItemResponse::from);
+    }
+
+    /**
+     * 마이페이지 — 아직 작성하지 않은 후기(종료 매칭·확정 참여 상대 중 미작성 쌍).
+     */
+    @Transactional(readOnly = true)
+    public Page<PendingReviewItemResponse> listMyPendingReviews(Long userId, Pageable pageable) {
+        long total = reviewRepository.countPendingReviewPairs(userId);
+        if (total == 0) {
+            return Page.empty(pageable);
+        }
+        List<Object[]> rows = reviewRepository.findPendingReviewPairsPage(
+                userId, pageable.getPageSize(), pageable.getOffset());
+        if (rows.isEmpty()) {
+            return PageableExecutionUtils.getPage(List.of(), pageable, () -> total);
+        }
+        List<Long> matchIds = rows.stream().map(r -> ((Number) r[0]).longValue()).distinct().toList();
+        List<Long> revieweeIds = rows.stream().map(r -> ((Number) r[1]).longValue()).distinct().toList();
+        Map<Long, Match> matchesById = matchRepository.findAllWithHostByIdIn(matchIds).stream()
+                .collect(Collectors.toMap(Match::getId, Function.identity()));
+        Map<Long, User> usersById = userRepository.findAllById(revieweeIds).stream()
+                .collect(Collectors.toMap(User::getId, Function.identity()));
+        List<PendingReviewItemResponse> content = rows.stream()
+                .map(r -> {
+                    Long mid = ((Number) r[0]).longValue();
+                    Long rid = ((Number) r[1]).longValue();
+                    Match m = matchesById.get(mid);
+                    User u = usersById.get(rid);
+                    return PendingReviewItemResponse.of(
+                            Objects.requireNonNull(m, "match not found: " + mid),
+                            Objects.requireNonNull(u, "user not found: " + rid));
+                })
+                .toList();
+        return PageableExecutionUtils.getPage(content, pageable, () -> total);
     }
 
     /**

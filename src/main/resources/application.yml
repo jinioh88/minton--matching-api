@@ -2,11 +2,11 @@ spring:
   application:
     name: minton-match-api
 
-  # Flyway는 운영(prod)에서만 켠다. 로컬은 Hibernate ddl-auto(update)로 스키마 반영.
+  # Flyway는 운영(prod)에서만 켠다. 로컬은 Hibernate ddl-auto로 스키마 반영.
   flyway:
     enabled: false
 
-  # 프로파일: local(로컬/H2), prod(운영/MySQL)
+  # 프로파일: local(로컬·MySQL), prod(운영/MySQL)
   # 기본값 local - 프로파일 미지정 시 로컬 환경 사용
   profiles:
     default: local
@@ -60,6 +60,20 @@ sanction:
 queue:
   offer-timeout-minutes: 15        # 예약 유효 시간 (분)
   emergency-threshold-hours: 2     # 긴급 선착순 전환 기준 (경기 시작 N시간 미만)
+
+# STOMP 다중 인스턴스: true 시 Redis Pub/Sub 으로 /topic·/queue·/user 브로커 메시지 중계 (spring.data.redis 필요)
+# CORS·WebSocket 허용 origin (쉼표 구분). 운영은 application-prod / 환경변수 CORS_ALLOWED_ORIGIN_PATTERNS 로 덮어쓴다.
+minton:
+  web:
+    cors-allowed-origin-patterns: http://localhost:3000,http://127.0.0.1:3000
+  chat:
+    stomp-redis-relay:
+      enabled: false
+      channel: minton:chat:stomp-relay
+  push:
+    fcm:
+      enabled: ${FCM_ENABLED:false}
+      credentials-path: ${FCM_CREDENTIALS_PATH:}
 
 app:
   s3:

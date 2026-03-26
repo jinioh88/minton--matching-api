@@ -198,6 +198,8 @@ Flutter 앱에서 OAuth 인증 후 받은 authorization code를 전달하여 JWT
 
 **인증** 필요 (`Authorization: Bearer {accessToken}`)
 
+마이페이지 집계 필드(`hostedMatchCount`, `participatedMatchCount`) 정책은 [Sprint7-API.md](./Sprint7-API.md) § Step 1 참고.
+
 **Response 예시**
 
 ```json
@@ -213,7 +215,9 @@ Flutter 앱에서 OAuth 인증 후 받은 authorization code를 전달하여 JWT
     "racketInfo": "요넥스 아크세이버",
     "playStyle": "공격형",
     "ratingScore": 5.0,
-    "penaltyCount": 0
+    "penaltyCount": 0,
+    "hostedMatchCount": 12,
+    "participatedMatchCount": 30
   }
 }
 ```
@@ -230,6 +234,8 @@ Flutter 앱에서 OAuth 인증 후 받은 authorization code를 전달하여 JWT
 | playStyle | String | 선호 플레이 스타일 |
 | ratingScore | Float | 매너/실력 평균 점수 (기본 5.0) |
 | penaltyCount | Integer | 노쇼/지각 누적 횟수 (기본 0) |
+| hostedMatchCount | Long | (본인만) 내가 방장으로 연 매칭 수 — [Sprint7-API.md](./Sprint7-API.md) |
+| participatedMatchCount | Long | (본인만) 참여 매칭 수 — [Sprint7-API.md](./Sprint7-API.md) |
 
 ---
 

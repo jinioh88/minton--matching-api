@@ -1,8 +1,10 @@
 package org.app.mintonmatchapi.notification.event;
 
 import lombok.extern.slf4j.Slf4j;
+import org.app.mintonmatchapi.notification.dto.NotificationRealtimePayload;
 import org.app.mintonmatchapi.notification.entity.Notification;
 import org.app.mintonmatchapi.notification.repository.NotificationRepository;
+import org.app.mintonmatchapi.notification.service.NotificationOutboundService;
 import org.app.mintonmatchapi.user.entity.User;
 import org.app.mintonmatchapi.user.repository.UserRepository;
 import org.springframework.stereotype.Component;
@@ -20,11 +22,14 @@ public class NotificationDispatchListener {
 
     private final NotificationRepository notificationRepository;
     private final UserRepository userRepository;
+    private final NotificationOutboundService notificationOutboundService;
 
     public NotificationDispatchListener(NotificationRepository notificationRepository,
-                                       UserRepository userRepository) {
+                                       UserRepository userRepository,
+                                       NotificationOutboundService notificationOutboundService) {
         this.notificationRepository = notificationRepository;
         this.userRepository = userRepository;
+        this.notificationOutboundService = notificationOutboundService;
     }
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
@@ -45,7 +50,8 @@ public class NotificationDispatchListener {
                     .relatedMatchId(command.relatedMatchId())
                     .relatedParticipantId(command.relatedParticipantId())
                     .build();
-            notificationRepository.save(notification);
+            Notification saved = notificationRepository.save(notification);
+            notificationOutboundService.dispatchAfterPersist(NotificationRealtimePayload.from(saved));
         } catch (Exception e) {
             log.warn("Failed to persist notification type={} recipientUserId={}",
                     command.type(), command.recipientUserId(), e);

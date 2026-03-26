@@ -1,7 +1,6 @@
--- ShedLock (JPA 엔티티가 아님). Hibernate ddl-auto=create 이후 실행(defer-datasource-initialization).
--- 기존 shedlock 행이 있으면 테이블만 갈아끼운다.
-DROP TABLE IF EXISTS shedlock;
-CREATE TABLE shedlock (
+-- ShedLock (JPA 엔티티가 아님). Hibernate 초기화 이후 실행(defer-datasource-initialization).
+-- 기존 테이블·데이터 유지: 없을 때만 생성.
+CREATE TABLE IF NOT EXISTS shedlock (
     name VARCHAR(64) NOT NULL,
     lock_until TIMESTAMP NOT NULL,
     locked_at TIMESTAMP NOT NULL,

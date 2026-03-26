@@ -11,6 +11,7 @@ import org.app.mintonmatchapi.notification.entity.NotificationType;
 import org.app.mintonmatchapi.notification.event.NotificationDispatchCommand;
 import org.app.mintonmatchapi.notification.service.NotificationService;
 import org.app.mintonmatchapi.match.dto.*;
+import org.app.mintonmatchapi.match.event.MatchChatClosedEvent;
 import org.app.mintonmatchapi.match.entity.Match;
 import org.app.mintonmatchapi.match.entity.MatchParticipant;
 import org.app.mintonmatchapi.match.entity.MatchStatus;
@@ -20,7 +21,9 @@ import org.app.mintonmatchapi.match.repository.MatchRepository;
 import org.app.mintonmatchapi.review.service.ReviewService;
 import org.app.mintonmatchapi.user.entity.User;
 import org.app.mintonmatchapi.user.repository.UserRepository;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -49,13 +52,15 @@ public class MatchService {
     private final ObjectProvider<PostAutoFinishNotifier> postAutoFinishNotifier;
     private final ReviewService reviewService;
     private final NotificationService notificationService;
+    private final ApplicationEventPublisher eventPublisher;
 
     public MatchService(MatchRepository matchRepository, MatchParticipantRepository matchParticipantRepository,
                        UserRepository userRepository, QueueProperties queueProperties,
                        MatchProperties matchProperties,
                        ObjectProvider<PostAutoFinishNotifier> postAutoFinishNotifier,
                        ReviewService reviewService,
-                       NotificationService notificationService) {
+                       NotificationService notificationService,
+                       ApplicationEventPublisher eventPublisher) {
         this.matchRepository = matchRepository;
         this.matchParticipantRepository = matchParticipantRepository;
         this.userRepository = userRepository;
@@ -64,6 +69,7 @@ public class MatchService {
         this.postAutoFinishNotifier = postAutoFinishNotifier;
         this.reviewService = reviewService;
         this.notificationService = notificationService;
+        this.eventPublisher = eventPublisher;
     }
 
     @Transactional
@@ -204,7 +210,30 @@ public class MatchService {
                 .build();
 
         Page<Match> matches = matchRepository.searchMatches(resolvedCondition);
+        return toMatchListResponsePage(matches);
+    }
 
+    /**
+     * 마이페이지 — 내가 방장인 매칭 목록 (Sprint7 Step2). 경기일 최신순.
+     */
+    @Transactional(readOnly = true)
+    public Page<MatchListResponse> getMyHostedMatches(Long userId, MatchStatus status,
+                                                      LocalDate dateFrom, LocalDate dateTo, Pageable pageable) {
+        Page<Match> matches = matchRepository.searchHostedByUser(userId, status, dateFrom, dateTo, pageable);
+        return toMatchListResponsePage(matches);
+    }
+
+    /**
+     * 마이페이지 — 확정(ACCEPTED) 참가 매칭 목록 (Sprint7 Step2). 경기일 최신순.
+     */
+    @Transactional(readOnly = true)
+    public Page<MatchListResponse> getMyParticipatedMatches(Long userId, MatchStatus status,
+                                                            LocalDate dateFrom, LocalDate dateTo, Pageable pageable) {
+        Page<Match> matches = matchRepository.searchParticipatedByUser(userId, status, dateFrom, dateTo, pageable);
+        return toMatchListResponsePage(matches);
+    }
+
+    private Page<MatchListResponse> toMatchListResponsePage(Page<Match> matches) {
         if (matches.isEmpty()) {
             return matches.map(m -> MatchListResponse.of(m, 0));
         }
@@ -318,6 +347,7 @@ public class MatchService {
 
         match.markFinished();
         Match finished = matchRepository.save(match);
+        eventPublisher.publishEvent(new MatchChatClosedEvent(matchId));
         return MatchResponse.from(finished);
     }
 
@@ -348,6 +378,7 @@ public class MatchService {
         match.markCancelled();
         Match saved = matchRepository.save(match);
         notifyAcceptedParticipantsOnMatchCancelled(saved);
+        eventPublisher.publishEvent(new MatchChatClosedEvent(matchId));
         return MatchResponse.from(saved);
     }
 
@@ -388,6 +419,9 @@ public class MatchService {
         }
         long updated = matchRepository.bulkMarkFinishedByIds(ids);
         log.info("매칭 자동 종료: {}건, matchIds={}, cutoff={}", updated, ids, cutoff);
+        for (Long id : ids) {
+            eventPublisher.publishEvent(new MatchChatClosedEvent(id));
+        }
         postAutoFinishNotifier.ifAvailable(n -> n.onMatchesAutoFinished(ids));
         return updated;
     }

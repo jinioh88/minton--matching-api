@@ -52,9 +52,20 @@ public class ProfileResponse {
     private Long receivedReviewCount;
 
     /**
+     * 본인만: 내가 방장으로 연 매칭 수(모든 상태·CANCELLED 포함). 타인 프로필에서는 미포함.
+     */
+    private Long hostedMatchCount;
+
+    /**
+     * 본인만: 참여 매칭 수 — 방장 매칭 ∪ ACCEPTED 참가, 매칭당 1회 집계. 타인 프로필에서는 미포함.
+     */
+    private Long participatedMatchCount;
+
+    /**
      * 내 프로필용 — 제재 시각·계정 상태 전부 노출.
      */
-    public static ProfileResponse ofMe(User user, long receivedReviewCount, int participationBanStrikeThreshold) {
+    public static ProfileResponse ofMe(User user, long receivedReviewCount, int participationBanStrikeThreshold,
+                                       long hostedMatchCount, long participatedMatchCount) {
         return ProfileResponse.builder()
                 .id(user.getId())
                 .nickname(user.getNickname())
@@ -72,6 +83,8 @@ public class ProfileResponse {
                 .accountStatus(user.getAccountStatus())
                 .showCautionBadge(computeShowCautionBadge(user, participationBanStrikeThreshold))
                 .receivedReviewCount(receivedReviewCount)
+                .hostedMatchCount(hostedMatchCount)
+                .participatedMatchCount(participatedMatchCount)
                 .build();
     }
 

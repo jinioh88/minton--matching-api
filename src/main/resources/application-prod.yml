@@ -1,6 +1,17 @@
-# 운영 환경 - AWS RDS (MySQL)
-# 환경변수: DB_URL(전체 URL) 또는 DB_HOST, DB_PORT, DB_NAME, DB_USERNAME, DB_PASSWORD
-# OAuth2 redirect-uri: OAUTH_REDIRECT_URI (기본값: Flutter 앱 스킴)
+# =============================================================================
+# 운영(prod) 프로파일 — spring.profiles.active=prod 일 때 병합된다.
+# 공통 기본값은 application.yml 을 참고한다.
+#
+# [직접 해야 할 일 요약]
+# 1) DB: DB_URL, DB_USERNAME, DB_PASSWORD (또는 URL에 비번 포함 시 PASSWORD만)
+# 2) JWT: JWT_SECRET — 최소 32자 이상 난수, 저장소에 평문 커밋 금지
+# 3) CORS·WebSocket: CORS_ALLOWED_ORIGIN_PATTERNS — 실제 웹 프론트 origin (https://…)
+# 4) OAuth: OAUTH_REDIRECT_URI — 앱/웹 실제 콜백 (카카오 등 콘솔에도 동일 등록)
+# 5) AWS S3: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_S3_BUCKET (또는 IAM 역할)
+# 6) STOMP 다중 인스턴스: ElastiCache 등 Redis + REDIS_* + STOMP_REDIS_RELAY_ENABLED=true
+# 7) FCM(선택): FCM_ENABLED=true + 서비스 계정 JSON 경로(FCM_CREDENTIALS_PATH) 또는 GOOGLE_APPLICATION_CREDENTIALS
+# =============================================================================
+
 spring:
   security:
     oauth2:
@@ -37,3 +48,38 @@ spring:
         format_sql: true
         dialect: org.hibernate.dialect.MySQLDialect
     open-in-view: false
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      ssl:
+        enabled: ${REDIS_SSL:false}
+
+# 리버스 프록시(ALB/Nginx) 뒤에서 HTTPS·클라이언트 IP 등을 올바르게 쓰려면 framework 권장
+server:
+  forward-headers-strategy: framework
+
+# 운영에서는 반드시 환경변수로 주입 (기본값 없음에 가깝게 유지)
+jwt:
+  secret: ${JWT_SECRET}
+  expiration-ms: ${JWT_EXPIRATION_MS:86400000}
+
+minton:
+  # 실제 웹 클라이언트 origin. 복수: https://app.example.com,https://www.example.com
+  # 비어 있으면 CORS·SockJS 핸드셰이크가 막힐 수 있음 → 반드시 설정
+  web:
+    cors-allowed-origin-patterns: ${CORS_ALLOWED_ORIGIN_PATTERNS:}
+
+  chat:
+    stomp-redis-relay:
+      # 단일 Pod면 false. 다중 replica + Redis 면 true
+      enabled: ${STOMP_REDIS_RELAY_ENABLED:false}
+      channel: ${STOMP_REDIS_RELAY_CHANNEL:minton:chat:stomp-relay}
+
+  push:
+    fcm:
+      enabled: ${FCM_ENABLED:false}
+      # 컨테이너에 마운트한 JSON 파일 절대 경로. 비우면 GOOGLE_APPLICATION_CREDENTIALS 환경변수 사용
+      credentials-path: ${FCM_CREDENTIALS_PATH:}

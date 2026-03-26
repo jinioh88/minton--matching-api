@@ -24,6 +24,58 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
     Page<Review> findPageWithRelationsByRevieweeId(@Param("revieweeId") Long revieweeId, Pageable pageable);
 
     /**
+     * 작성자 기준 내가 쓴 후기 목록: match·host·reviewee·hashtags 한 번에 로딩.
+     */
+    @EntityGraph(attributePaths = {"match", "match.host", "reviewee", "hashtags"})
+    @Query("select r from Review r where r.reviewer.id = :reviewerId")
+    Page<Review> findPageWithRelationsByReviewerId(@Param("reviewerId") Long reviewerId, Pageable pageable);
+
+    @Query(value = """
+            SELECT COUNT(*) FROM (
+              SELECT DISTINCT m.match_id, cand.uid
+              FROM matches m
+              INNER JOIN (
+                SELECT match_id, host_id AS uid FROM matches WHERE status = 'FINISHED'
+                UNION ALL
+                SELECT match_id, user_id AS uid FROM match_participants WHERE status = 'ACCEPTED'
+              ) cand ON cand.match_id = m.match_id
+              WHERE m.status = 'FINISHED'
+              AND (m.host_id = :userId OR EXISTS (
+                SELECT 1 FROM match_participants mp2
+                WHERE mp2.match_id = m.match_id AND mp2.user_id = :userId AND mp2.status = 'ACCEPTED'))
+              AND cand.uid <> :userId
+              AND NOT EXISTS (
+                SELECT 1 FROM reviews r
+                WHERE r.match_id = m.match_id AND r.reviewer_id = :userId AND r.reviewee_id = cand.uid)
+            ) t
+            """, nativeQuery = true)
+    long countPendingReviewPairs(@Param("userId") Long userId);
+
+    @Query(value = """
+            SELECT DISTINCT m.match_id, cand.uid
+            FROM matches m
+            INNER JOIN (
+              SELECT match_id, host_id AS uid FROM matches WHERE status = 'FINISHED'
+              UNION ALL
+              SELECT match_id, user_id AS uid FROM match_participants WHERE status = 'ACCEPTED'
+            ) cand ON cand.match_id = m.match_id
+            WHERE m.status = 'FINISHED'
+            AND (m.host_id = :userId OR EXISTS (
+              SELECT 1 FROM match_participants mp2
+              WHERE mp2.match_id = m.match_id AND mp2.user_id = :userId AND mp2.status = 'ACCEPTED'))
+            AND cand.uid <> :userId
+            AND NOT EXISTS (
+              SELECT 1 FROM reviews r
+              WHERE r.match_id = m.match_id AND r.reviewer_id = :userId AND r.reviewee_id = cand.uid)
+            ORDER BY m.match_id DESC, cand.uid ASC
+            LIMIT :limit OFFSET :offset
+            """, nativeQuery = true)
+    List<Object[]> findPendingReviewPairsPage(
+            @Param("userId") Long userId,
+            @Param("limit") int limit,
+            @Param("offset") long offset);
+
+    /**
      * 같은 매칭에서 두 유저 간 양방향 후기가 모두 존재하면 2 (유니크 제약 하에서 최대 2).
      */
     @Query("""

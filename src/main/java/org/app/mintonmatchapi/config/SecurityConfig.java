@@ -23,15 +23,18 @@ import java.util.List;
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final MintonWebProperties mintonWebProperties;
 
-    public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter) {
+    public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter,
+                         MintonWebProperties mintonWebProperties) {
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
+        this.mintonWebProperties = mintonWebProperties;
     }
 
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(List.of("http://localhost:3000"));
+        configuration.setAllowedOriginPatterns(mintonWebProperties.corsAllowedOriginPatternList());
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setAllowCredentials(true);
@@ -50,6 +53,7 @@ public class SecurityConfig {
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/ws-chat", "/ws-chat/**").permitAll()
                         .requestMatchers("/api/auth/**", "/api/health", "/api/users/check-nickname").permitAll()
                         .requestMatchers("/api/users/me", "/api/users/me/**", "/api/files/upload").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/matches").authenticated()

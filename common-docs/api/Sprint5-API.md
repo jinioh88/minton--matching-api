@@ -1,6 +1,6 @@
 # Sprint 5 API 문서 — 채팅(REST) · 인앱 알림
 
-> 프론트엔드 연동용 명세. **채팅·알림 모두 Sprint 5 기준 실시간이 아니다**(서버 푸시·WebSocket 구독 없음). **WebSocket + STOMP** 는 Sprint 6([Sprint6-할일.md](../../docs/Sprint6-할일.md) Step 1) 예정이며, 본 스프린트는 **HTTP + DB** 가 소스 오브 트루스다.  
+> 프론트엔드 연동용 명세. **채팅**은 Sprint 6에서 **WebSocket + STOMP** 실시간을 쓸 수 있다([Sprint6-API.md](./Sprint6-API.md)). **알림**은 DB·REST가 소스 오브 트루스이며, Sprint 6 Step 3 이후 **STOMP `/user/queue/notifications`** 및 **FCM 푸시**(설정 시)로 단말 전달이 추가된다(상세는 Sprint6 §12).  
 > 참조: [Sprint1-API.md](./Sprint1-API.md) ~ [Sprint4-API.md](./Sprint4-API.md), `docs/요구사항분석.md`, `docs/Sprint5-할일.md`, `docs/Sprint6-할일.md`
 
 ---
@@ -12,7 +12,7 @@
 | 영역 | 저장소 | 인증 | 비고 |
 |------|--------|------|------|
 | **채팅** | `chat_rooms`, `chat_messages` | JWT 필수 | 방장 또는 해당 매칭 **ACCEPTED** 만 접근·조회. **쓰기**는 매칭이 `FINISHED` / `CANCELLED` 이면 불가. **타인 메시지 수신은 폴링 등 REST 재조회**만 해당(실시간 아님). |
-| **알림** | `notifications` | JWT 필수 | 트랜잭션 **커밋 후** 비동기로 INSERT. 수신자 본인만 목록·읽음 처리. |
+| **알림** | `notifications` (+ `device_push_tokens`) | JWT 필수 | 트랜잭션 **커밋 후** 비동기로 INSERT. 수신자 본인만 목록·읽음·푸시 토큰 등록. 실시간·푸시는 [Sprint6 §12](./Sprint6-API.md#12-알림--fcm--stomp). |
 
 ### 1.2 데이터 흐름 (개념도)
 
@@ -48,7 +48,7 @@ flowchart LR
 
 ### 1.3 알림 생성 경로 (백엔드 내부)
 
-참여·대기열·취소 등 비즈니스 로직이 `NotificationService.publishAfterCommit` → `@TransactionalEventListener(AFTER_COMMIT)` → 별도 트랜잭션으로 `notifications` INSERT. 프론트는 **이벤트를 구독할 수 없고**, `GET /api/notifications` · `unread-count` 로 **폴링**하거나 화면 진입 시 갱신하면 된다.
+참여·대기열·취소 등이 `NotificationService.publishAfterCommit` → `@TransactionalEventListener(AFTER_COMMIT)` → 별도 트랜잭션으로 `notifications` INSERT. INSERT 직후 서버가 **STOMP** `convertAndSendToUser`·(FCM 켜짐 시) **푸시**로 단말에도 보낸다([Sprint6-API.md](./Sprint6-API.md) §12). 과거 메시지·목록은 여전히 **`GET /api/notifications`** · `unread-count` 가 기준이며, 폴링은 STOMP 미사용 클라이언트용으로만 보면 된다.
 
 ### 1.4 채팅 — 메시지 확인 방식 (비실시간)
 
@@ -186,6 +186,8 @@ flowchart LR
 | GET | `/api/notifications/unread-count` | 미읽음 건수 (`data` = number) |
 | PATCH | `/api/notifications/{notificationId}/read` | 단건 읽음 (`readAt` 설정) |
 | POST | `/api/notifications/read-all` | 미읽음 일괄 읽음 (`data` = 갱신된 행 수 int) |
+| POST | `/api/notifications/push-tokens` | FCM 토큰 등록·갱신(Upsert), JWT 필수 ([§4.6](#46-push-토큰-fcm)) |
+| POST | `/api/notifications/push-tokens/revoke` | 토큰 해지(로그아웃 등), JWT 필수 ([§4.6](#46-push-토큰-fcm)) |
 
 ### 4.2 `GET /api/notifications`
 
@@ -260,6 +262,26 @@ flowchart LR
 
 - title: `모임이 취소되었습니다`
 - body: `방장이 '{매칭제목}' 매칭을 취소했습니다.`
+
+### 4.6 Push 토큰 (FCM)
+
+| API | 본문 | 설명 |
+|-----|------|------|
+| `POST /api/notifications/push-tokens` | [`PushTokenRegisterRequest`](#461-pushtokenregisterrequest) | 동일 `fcmToken` 이 이미 있으면 **현재 사용자**로 소유 이전·플랫폼 갱신(멀티 기기는 행 여러 개). |
+| `POST /api/notifications/push-tokens/revoke` | [`PushTokenRevokeRequest`](#462-pushtokenrevokerequest) | 본인에게 매핑된 토큰만 비활성화. 없으면 **멱등** 성공. |
+
+#### 4.6.1 `PushTokenRegisterRequest`
+
+| 필드 | 타입 | 필수 | 설명 |
+|------|------|------|------|
+| fcmToken | string | 예 | FCM 등록 토큰 (최대 512자) |
+| platform | string enum | 예 | `ANDROID` \| `IOS` |
+
+#### 4.6.2 `PushTokenRevokeRequest`
+
+| 필드 | 타입 | 필수 | 설명 |
+|------|------|------|------|
+| token | string | 예 | 해지할 FCM 토큰 (최대 512자) |
 
 ---
 

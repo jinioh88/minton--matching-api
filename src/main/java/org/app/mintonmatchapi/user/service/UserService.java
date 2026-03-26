@@ -4,6 +4,8 @@ import org.app.mintonmatchapi.common.exception.BusinessException;
 import org.app.mintonmatchapi.common.exception.ErrorCode;
 import org.app.mintonmatchapi.file.dto.FileUploadType;
 import org.app.mintonmatchapi.file.service.S3Service;
+import org.app.mintonmatchapi.match.entity.ParticipantStatus;
+import org.app.mintonmatchapi.match.repository.MatchRepository;
 import org.app.mintonmatchapi.penalty.config.SanctionProperties;
 import org.app.mintonmatchapi.review.repository.ReviewRepository;
 import org.app.mintonmatchapi.user.dto.NicknameCheckResponse;
@@ -24,13 +26,16 @@ public class UserService {
     private final S3Service s3Service;
     private final ReviewRepository reviewRepository;
     private final SanctionProperties sanctionProperties;
+    private final MatchRepository matchRepository;
 
     public UserService(UserRepository userRepository, S3Service s3Service,
-                       ReviewRepository reviewRepository, SanctionProperties sanctionProperties) {
+                       ReviewRepository reviewRepository, SanctionProperties sanctionProperties,
+                       MatchRepository matchRepository) {
         this.userRepository = userRepository;
         this.s3Service = s3Service;
         this.reviewRepository = reviewRepository;
         this.sanctionProperties = sanctionProperties;
+        this.matchRepository = matchRepository;
     }
 
     public NicknameCheckResponse checkNickname(String nickname) {
@@ -104,7 +109,15 @@ public class UserService {
     }
 
     private ProfileResponse toProfileMe(User user) {
-        return ProfileResponse.ofMe(user, receivedReviewCount(user.getId()), participationBanStrikeThreshold());
+        Long userId = user.getId();
+        long hosted = matchRepository.countByHost_Id(userId);
+        long participated = matchRepository.countDistinctParticipatedForUser(userId, ParticipantStatus.ACCEPTED);
+        return ProfileResponse.ofMe(
+                user,
+                receivedReviewCount(userId),
+                participationBanStrikeThreshold(),
+                hosted,
+                participated);
     }
 
     private ProfileResponse toProfileOther(User user) {

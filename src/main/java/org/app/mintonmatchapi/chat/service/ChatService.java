@@ -8,9 +8,14 @@ import org.app.mintonmatchapi.chat.repository.ChatMessageRepository;
 import org.app.mintonmatchapi.chat.repository.ChatRoomRepository;
 import org.app.mintonmatchapi.common.exception.BusinessException;
 import org.app.mintonmatchapi.common.exception.ErrorCode;
+import org.app.mintonmatchapi.match.entity.Match;
+import org.app.mintonmatchapi.match.entity.MatchStatus;
 import org.app.mintonmatchapi.user.entity.User;
 import org.app.mintonmatchapi.user.repository.UserRepository;
 import org.springframework.data.domain.Page;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -33,15 +38,18 @@ public class ChatService {
     private final ChatMessageRepository chatMessageRepository;
     private final ChatRoomService chatRoomService;
     private final UserRepository userRepository;
+    private final SimpMessagingTemplate messagingTemplate;
 
     public ChatService(ChatRoomRepository chatRoomRepository,
                       ChatMessageRepository chatMessageRepository,
                       ChatRoomService chatRoomService,
-                      UserRepository userRepository) {
+                      UserRepository userRepository,
+                      SimpMessagingTemplate messagingTemplate) {
         this.chatRoomRepository = chatRoomRepository;
         this.chatMessageRepository = chatMessageRepository;
         this.chatRoomService = chatRoomService;
         this.userRepository = userRepository;
+        this.messagingTemplate = messagingTemplate;
     }
 
     @Transactional(readOnly = true)
@@ -127,6 +135,9 @@ public class ChatService {
         User sender = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
         ChatMessageType type = request.getMessageType() != null ? request.getMessageType() : ChatMessageType.TEXT;
+        if (type != ChatMessageType.TEXT && type != ChatMessageType.IMAGE) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "messageType은 TEXT 또는 IMAGE만 허용됩니다.");
+        }
         ChatMessage message = ChatMessage.builder()
                 .room(room)
                 .sender(sender)
@@ -167,5 +178,47 @@ public class ChatService {
             throw new BusinessException(ErrorCode.FORBIDDEN, "본인이 보낸 메시지만 삭제할 수 있습니다.");
         }
         message.markDeleted();
+    }
+
+    /**
+     * 매칭이 {@link MatchStatus#FINISHED} 또는 {@link MatchStatus#CANCELLED} 인 경우에만,
+     * 채팅방에 SYSTEM 안내 1건을 저장하고 커밋 후 {@code /topic/chat.{roomId}} 로 브로드캐스트한다.
+     */
+    @Transactional
+    public void publishMatchTerminalSystemMessageAndBroadcast(Long matchId) {
+        ChatRoom room = chatRoomRepository.findByMatchId(matchId).orElse(null);
+        if (room == null) {
+            return;
+        }
+        ChatRoom loaded = chatRoomService.getByIdWithMatchAndHostOrThrow(room.getId());
+        Match match = loaded.getMatch();
+        MatchStatus status = match.getStatus();
+        if (status != MatchStatus.FINISHED && status != MatchStatus.CANCELLED) {
+            return;
+        }
+        User host = match.getHost();
+        String content = status == MatchStatus.CANCELLED
+                ? "모임이 취소되어 채팅에서 새 메시지를 보낼 수 없습니다."
+                : "모임이 종료되어 채팅에서 새 메시지를 보낼 수 없습니다.";
+        ChatMessage msg = ChatMessage.builder()
+                .room(loaded)
+                .sender(host)
+                .content(content)
+                .messageType(ChatMessageType.SYSTEM)
+                .build();
+        ChatMessage saved = chatMessageRepository.save(msg);
+        ChatMessageResponse response = ChatMessageResponse.from(saved);
+        long roomId = loaded.getId();
+        String destination = "/topic/chat." + roomId;
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    messagingTemplate.convertAndSend(destination, response);
+                }
+            });
+        } else {
+            messagingTemplate.convertAndSend(destination, response);
+        }
     }
 }

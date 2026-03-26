@@ -3,8 +3,12 @@ package org.app.mintonmatchapi.notification.controller;
 import org.app.mintonmatchapi.auth.AuthUtils;
 import org.app.mintonmatchapi.auth.UserPrincipal;
 import org.app.mintonmatchapi.common.dto.ApiResponse;
+import jakarta.validation.Valid;
 import org.app.mintonmatchapi.notification.dto.NotificationResponse;
+import org.app.mintonmatchapi.notification.dto.PushTokenRegisterRequest;
+import org.app.mintonmatchapi.notification.dto.PushTokenRevokeRequest;
 import org.app.mintonmatchapi.notification.service.NotificationService;
+import org.app.mintonmatchapi.notification.service.PushTokenService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -15,9 +19,11 @@ import org.springframework.web.bind.annotation.*;
 public class NotificationController {
 
     private final NotificationService notificationService;
+    private final PushTokenService pushTokenService;
 
-    public NotificationController(NotificationService notificationService) {
+    public NotificationController(NotificationService notificationService, PushTokenService pushTokenService) {
         this.notificationService = notificationService;
+        this.pushTokenService = pushTokenService;
     }
 
     @GetMapping
@@ -49,5 +55,23 @@ public class NotificationController {
         Long userId = AuthUtils.getUserIdOrThrow(principal);
         int updated = notificationService.markAllRead(userId);
         return ApiResponse.success(updated);
+    }
+
+    @PostMapping("/push-tokens")
+    public ApiResponse<Void> registerPushToken(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @Valid @RequestBody PushTokenRegisterRequest request) {
+        Long userId = AuthUtils.getUserIdOrThrow(principal);
+        pushTokenService.registerOrUpdate(userId, request.getFcmToken(), request.getPlatform());
+        return ApiResponse.success(null);
+    }
+
+    @PostMapping("/push-tokens/revoke")
+    public ApiResponse<Void> revokePushToken(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @Valid @RequestBody PushTokenRevokeRequest request) {
+        Long userId = AuthUtils.getUserIdOrThrow(principal);
+        pushTokenService.revoke(userId, request.getToken());
+        return ApiResponse.success(null);
     }
 }
