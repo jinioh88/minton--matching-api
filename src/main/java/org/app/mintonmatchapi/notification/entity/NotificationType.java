@@ -18,5 +18,9 @@ public enum NotificationType {
      * 방장이 매칭을 취소(CANCELLED)한 경우.
      * 수신 범위: 해당 매칭의 <strong>ACCEPTED</strong> 참가자만. <strong>방장 본인은 제외</strong>(본인이 취소 주체).
      */
-    MATCH_CANCELLED
+    MATCH_CANCELLED,
+    /** 내가 팔로우한 사용자(호스트)가 새 매칭을 생성했을 때 팔로워에게 */
+    FRIEND_CREATED_MATCH,
+    /** 내가 팔로우한 사용자가 매칭 참여를 ACCEPTED로 확정했을 때 팔로워에게 */
+    FRIEND_CONFIRMED_PARTICIPATION
 }

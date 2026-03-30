@@ -240,7 +240,7 @@ STOMP **`ERROR`** → 연결 종료·재로그인 유도.
 |------|------|------|
 | notificationId | number | PK |
 | recipientUserId | number | 수신자 |
-| type | string | [NotificationType](./Sprint5-API.md#43-notificationtype-enum) |
+| type | string | [`NotificationType`](./Sprint5-API.md#43-notificationtype-enum) (Sprint 8: `FRIEND_CREATED_MATCH`, `FRIEND_CONFIRMED_PARTICIPATION` 포함) |
 | title | string | 제목 |
 | summary | string | 본문 요약(알림 `body`와 동일) |
 | relatedMatchId | number \| null | |

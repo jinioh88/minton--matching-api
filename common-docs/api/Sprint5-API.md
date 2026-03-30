@@ -219,6 +219,10 @@ flowchart LR
 | `WAITLIST_SLOT_OFFER` | 대기 1순위 | 순차 승격으로 RESERVED 부여, 본문에 수락 제한 **분** 안내 |
 | `WAITLIST_EMERGENCY_OPEN` | WAITING 전원 | 긴급 모드 선착순 안내 |
 | `MATCH_CANCELLED` | ACCEPTED 참가자(방장 제외) | 방장이 매칭 취소 |
+| `FRIEND_CREATED_MATCH` | 내가 팔로우한 사용자(호스트)의 팔로워 각각 | 팔로우 대상이 새 매칭 생성 |
+| `FRIEND_CONFIRMED_PARTICIPATION` | 내가 팔로우한 사용자(참여자)의 팔로워 각각 | 팔로우 대상이 매칭 참여 ACCEPTED 확정 |
+
+상세(타깃팅·딥링크·문구): [Sprint8-API.md](./Sprint8-API.md) §3.
 
 ### 4.4 `payload` · 딥링크 (MVP)
 
@@ -262,6 +266,11 @@ flowchart LR
 
 - title: `모임이 취소되었습니다`
 - body: `방장이 '{매칭제목}' 매칭을 취소했습니다.`
+
+**`FRIEND_CREATED_MATCH`** · **`FRIEND_CONFIRMED_PARTICIPATION`** (Sprint 8, 수신자·`relatedMatchId`는 [Sprint8-API.md](./Sprint8-API.md) §3)
+
+- `FRIEND_CREATED_MATCH` — title: `새 매칭`, body: `{닉네임}님이 새로운 매칭을 만들었습니다! 지금 확인해보세요.`
+- `FRIEND_CONFIRMED_PARTICIPATION` — title: `참여 확정`, body: `{닉네임}님이 매칭 참여를 확정했습니다! 함께 참여하시겠어요?`
 
 ### 4.6 Push 토큰 (FCM)
 

@@ -14,6 +14,7 @@ import org.app.mintonmatchapi.match.entity.MatchStatus;
 import org.app.mintonmatchapi.match.entity.ParticipantStatus;
 import org.app.mintonmatchapi.match.event.ParticipantCancelledEvent;
 import org.app.mintonmatchapi.chat.service.ChatRoomService;
+import org.app.mintonmatchapi.friendship.service.FriendActivityNotificationService;
 import org.app.mintonmatchapi.notification.entity.NotificationType;
 import org.app.mintonmatchapi.notification.event.NotificationDispatchCommand;
 import org.app.mintonmatchapi.notification.service.NotificationService;
@@ -44,6 +45,7 @@ public class MatchParticipantService {
     private final QueueProperties queueProperties;
     private final ChatRoomService chatRoomService;
     private final NotificationService notificationService;
+    private final FriendActivityNotificationService friendActivityNotificationService;
 
     public MatchParticipantService(MatchRepository matchRepository,
                                   MatchParticipantRepository matchParticipantRepository,
@@ -51,7 +53,8 @@ public class MatchParticipantService {
                                   ApplicationEventPublisher eventPublisher,
                                   QueueProperties queueProperties,
                                   ChatRoomService chatRoomService,
-                                  NotificationService notificationService) {
+                                  NotificationService notificationService,
+                                  FriendActivityNotificationService friendActivityNotificationService) {
         this.matchRepository = matchRepository;
         this.matchParticipantRepository = matchParticipantRepository;
         this.userRepository = userRepository;
@@ -59,6 +62,7 @@ public class MatchParticipantService {
         this.queueProperties = queueProperties;
         this.chatRoomService = chatRoomService;
         this.notificationService = notificationService;
+        this.friendActivityNotificationService = friendActivityNotificationService;
     }
 
     @Transactional
@@ -179,6 +183,7 @@ public class MatchParticipantService {
                     String.format("'%s' 매칭 신청이 수락되었습니다.", matchTitle),
                     matchId,
                     saved.getId()));
+            friendActivityNotificationService.publishParticipationConfirmedToFollowers(match, saved);
         } else if (action == ParticipantDecisionRequest.ParticipantDecisionAction.REJECT) {
             notificationService.publishAfterCommit(NotificationDispatchCommand.of(
                     saved.getUser().getId(),
@@ -240,6 +245,7 @@ public class MatchParticipantService {
                 String.format("'%s' 매칭에 확정되었습니다. 예약을 수락했습니다.", matchTitle),
                 matchId,
                 saved.getId()));
+        friendActivityNotificationService.publishParticipationConfirmedToFollowers(match, saved);
         return ParticipantApplyResponse.from(saved);
     }
 

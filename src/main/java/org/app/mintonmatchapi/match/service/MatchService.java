@@ -16,6 +16,7 @@ import org.app.mintonmatchapi.match.entity.Match;
 import org.app.mintonmatchapi.match.entity.MatchParticipant;
 import org.app.mintonmatchapi.match.entity.MatchStatus;
 import org.app.mintonmatchapi.match.entity.ParticipantStatus;
+import org.app.mintonmatchapi.friendship.service.FriendActivityNotificationService;
 import org.app.mintonmatchapi.match.repository.MatchParticipantRepository;
 import org.app.mintonmatchapi.match.repository.MatchRepository;
 import org.app.mintonmatchapi.review.service.ReviewService;
@@ -52,6 +53,7 @@ public class MatchService {
     private final ObjectProvider<PostAutoFinishNotifier> postAutoFinishNotifier;
     private final ReviewService reviewService;
     private final NotificationService notificationService;
+    private final FriendActivityNotificationService friendActivityNotificationService;
     private final ApplicationEventPublisher eventPublisher;
 
     public MatchService(MatchRepository matchRepository, MatchParticipantRepository matchParticipantRepository,
@@ -60,6 +62,7 @@ public class MatchService {
                        ObjectProvider<PostAutoFinishNotifier> postAutoFinishNotifier,
                        ReviewService reviewService,
                        NotificationService notificationService,
+                       FriendActivityNotificationService friendActivityNotificationService,
                        ApplicationEventPublisher eventPublisher) {
         this.matchRepository = matchRepository;
         this.matchParticipantRepository = matchParticipantRepository;
@@ -69,6 +72,7 @@ public class MatchService {
         this.postAutoFinishNotifier = postAutoFinishNotifier;
         this.reviewService = reviewService;
         this.notificationService = notificationService;
+        this.friendActivityNotificationService = friendActivityNotificationService;
         this.eventPublisher = eventPublisher;
     }
 
@@ -98,6 +102,7 @@ public class MatchService {
                 .build();
 
         Match saved = matchRepository.save(match);
+        friendActivityNotificationService.publishNewMatchCreatedToFollowers(saved, host);
         return MatchResponse.from(saved);
     }
 

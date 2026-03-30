@@ -11,6 +11,7 @@
 | Sprint 3 | [Sprint3-API.md](./Sprint3-API.md) | 참여 신청, 수락/거절, 대기열, 취소 API |
 | Sprint 6 | [Sprint6-API.md](./Sprint6-API.md) | **신규 REST**(푸시 토큰)·STOMP·FCM·Redis·운영 env (채팅·알림 CRUD REST는 Sprint 5) |
 | Sprint 7 | [Sprint7-API.md](./Sprint7-API.md) | 마이페이지 보강 — 내 프로필 집계 등 (`GET /api/users/me` 확장) |
+| Sprint 8 | [Sprint8-API.md](./Sprint8-API.md) | 친구(팔로우) REST, 소셜 활동 알림 타입·`relatedMatchId` |
 
 ---
 
@@ -64,6 +65,9 @@
 | POST | /api/matches/{matchId}/participants/me/accept-offer | Sprint 3 | 예약 수락 |
 | POST | /api/matches/{matchId}/participants/me/reject-offer | Sprint 3 | 예약 거절 |
 | GET | /api/matches/{matchId}/participants/applications | Sprint 3 | 방장 신청 목록 조회 |
+| POST | /api/users/me/friendships | Sprint 8 | 친구(팔로우) 추가 |
+| GET | /api/users/me/friendships | Sprint 8 | 내 팔로잉 목록 |
+| DELETE | /api/users/me/friendships/{followingUserId} | Sprint 8 | 언팔로우 |
 
 ---
 
@@ -89,4 +93,4 @@
 
 ---
 
-**Sprint 1 API 상세**는 [Sprint1-API.md](./Sprint1-API.md), **Sprint 2 API 상세**는 [Sprint2-API.md](./Sprint2-API.md), **Sprint 3 API 상세**는 [Sprint3-API.md](./Sprint3-API.md)를 참조하세요. **Sprint 6 API·실시간 연동**은 [Sprint6-API.md](./Sprint6-API.md)를 참조하세요.
+**Sprint 1 API 상세**는 [Sprint1-API.md](./Sprint1-API.md), **Sprint 2 API 상세**는 [Sprint2-API.md](./Sprint2-API.md), **Sprint 3 API 상세**는 [Sprint3-API.md](./Sprint3-API.md)를 참조하세요. **Sprint 6 API·실시간 연동**은 [Sprint6-API.md](./Sprint6-API.md), **Sprint 7**은 [Sprint7-API.md](./Sprint7-API.md), **Sprint 8(친구·소셜 알림)**은 [Sprint8-API.md](./Sprint8-API.md)를 참조하세요.
