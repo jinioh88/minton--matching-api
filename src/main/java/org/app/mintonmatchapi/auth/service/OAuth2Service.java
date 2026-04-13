@@ -2,6 +2,7 @@ package org.app.mintonmatchapi.auth.service;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.extern.slf4j.Slf4j;
 import org.app.mintonmatchapi.auth.dto.AuthResponse;
 import org.app.mintonmatchapi.auth.dto.OAuthLoginRequest;
 import org.app.mintonmatchapi.common.exception.BusinessException;
@@ -16,14 +17,17 @@ import org.springframework.http.MediaType;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientResponseException;
 
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.Map;
 
+@Slf4j
 @Service
 public class OAuth2Service {
 
@@ -77,14 +81,23 @@ public class OAuth2Service {
         params.add("code", code);
         params.add("redirect_uri", redirectUri);
         params.add("client_id", registration.getClientId());
-        params.add("client_secret", registration.getClientSecret());
+        if (StringUtils.hasText(registration.getClientSecret())) {
+            params.add("client_secret", registration.getClientSecret());
+        }
 
-        Map<String, Object> response = restClient.post()
-                .uri(registration.getProviderDetails().getTokenUri())
-                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
-                .body(params)
-                .retrieve()
-                .body(new ParameterizedTypeReference<Map<String, Object>>() {});
+        Map<String, Object> response;
+        try {
+            response = restClient.post()
+                    .uri(registration.getProviderDetails().getTokenUri())
+                    .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                    .body(params)
+                    .retrieve()
+                    .body(new ParameterizedTypeReference<Map<String, Object>>() {});
+        } catch (RestClientResponseException e) {
+            logOAuthTokenExchangeFailure(registration, redirectUri, e);
+            throw new BusinessException(ErrorCode.OAUTH_INVALID, buildOAuthTokenExchangeFailureMessage(registration, e));
+        }
+
         if (response == null) {
             throw new BusinessException(ErrorCode.OAUTH_INVALID, "토큰 교환에 실패했습니다.");
         }
@@ -110,11 +123,20 @@ public class OAuth2Service {
             throw new BusinessException(ErrorCode.OAUTH_INVALID, "사용자 정보 API를 지원하지 않는 제공자입니다.");
         }
 
-        Map<String, Object> userInfo = restClient.get()
-                .uri(userInfoUri)
-                .headers(h -> h.setBearerAuth(tokenResult.accessToken()))
-                .retrieve()
-                .body(new ParameterizedTypeReference<Map<String, Object>>() {});
+        Map<String, Object> userInfo;
+        try {
+            userInfo = restClient.get()
+                    .uri(userInfoUri)
+                    .headers(h -> h.setBearerAuth(tokenResult.accessToken()))
+                    .retrieve()
+                    .body(new ParameterizedTypeReference<Map<String, Object>>() {});
+        } catch (RestClientResponseException e) {
+            log.warn("OAuth 사용자 정보 조회 실패 provider={}, status={}, body={}",
+                    registration.getRegistrationId(),
+                    e.getStatusCode().value(),
+                    e.getResponseBodyAsString());
+            throw new BusinessException(ErrorCode.OAUTH_INVALID, "사용자 정보 조회에 실패했습니다.");
+        }
         if (userInfo == null) {
             throw new BusinessException(ErrorCode.OAUTH_INVALID, "사용자 정보 조회에 실패했습니다.");
         }
@@ -136,6 +158,65 @@ public class OAuth2Service {
             return result;
         } catch (Exception e) {
             throw new BusinessException(ErrorCode.OAUTH_INVALID, "Apple ID Token 파싱에 실패했습니다.");
+        }
+    }
+
+    private void logOAuthTokenExchangeFailure(ClientRegistration registration, String redirectUri, RestClientResponseException e) {
+        String provider = registration.getRegistrationId();
+        String responseBody = e.getResponseBodyAsString();
+        String oauthError = extractOAuthError(responseBody);
+        String errorDescription = extractOAuthErrorDescription(responseBody);
+
+        if ("kakao".equalsIgnoreCase(provider)) {
+            log.warn("Kakao 토큰 교환 실패 provider={}, status={}, redirectUri={}, tokenUri={}, error={}, errorDescription={}, body={}",
+                    provider,
+                    e.getStatusCode().value(),
+                    redirectUri,
+                    registration.getProviderDetails().getTokenUri(),
+                    oauthError,
+                    errorDescription,
+                    responseBody);
+            return;
+        }
+
+        log.warn("OAuth 토큰 교환 실패 provider={}, status={}, redirectUri={}, tokenUri={}, error={}, errorDescription={}, body={}",
+                provider,
+                e.getStatusCode().value(),
+                redirectUri,
+                registration.getProviderDetails().getTokenUri(),
+                oauthError,
+                errorDescription,
+                responseBody);
+    }
+
+    private String buildOAuthTokenExchangeFailureMessage(ClientRegistration registration, RestClientResponseException e) {
+        String provider = registration.getRegistrationId().toUpperCase();
+        String oauthError = extractOAuthError(e.getResponseBodyAsString());
+        String errorDescription = extractOAuthErrorDescription(e.getResponseBodyAsString());
+        return String.format("%s OAuth 토큰 교환 실패: %s (%s)", provider, oauthError, errorDescription);
+    }
+
+    private String extractOAuthError(String responseBody) {
+        Map<String, Object> errorBody = parseResponseBodyToMap(responseBody);
+        Object error = errorBody.get("error");
+        return error != null ? error.toString() : "unknown";
+    }
+
+    private String extractOAuthErrorDescription(String responseBody) {
+        Map<String, Object> errorBody = parseResponseBodyToMap(responseBody);
+        Object errorDescription = errorBody.get("error_description");
+        return errorDescription != null ? errorDescription.toString() : "unknown";
+    }
+
+    private Map<String, Object> parseResponseBodyToMap(String responseBody) {
+        if (!StringUtils.hasText(responseBody)) {
+            return Map.of();
+        }
+
+        try {
+            return new ObjectMapper().readValue(responseBody, new TypeReference<>() {});
+        } catch (Exception ignored) {
+            return Map.of();
         }
     }
 

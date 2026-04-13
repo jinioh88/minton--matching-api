@@ -16,6 +16,9 @@ public class OAuth2Properties {
      * Request의 redirectUri가 이 목록에 있는지 검증 후 토큰 교환 진행.
      */
     private List<String> allowedRedirectUris = new ArrayList<>();
+    private String mobileCallbackUri = "com.mintonmatch.app://oauth/callback";
+    private String stateSigningSecret = "change-this-oauth-state-secret-in-production";
+    private long stateTtlSeconds = 300;
 
     public List<String> getAllowedRedirectUris() {
         return allowedRedirectUris;
@@ -23,6 +26,30 @@ public class OAuth2Properties {
 
     public void setAllowedRedirectUris(List<String> allowedRedirectUris) {
         this.allowedRedirectUris = allowedRedirectUris;
+    }
+
+    public String getMobileCallbackUri() {
+        return mobileCallbackUri;
+    }
+
+    public void setMobileCallbackUri(String mobileCallbackUri) {
+        this.mobileCallbackUri = mobileCallbackUri;
+    }
+
+    public String getStateSigningSecret() {
+        return stateSigningSecret;
+    }
+
+    public void setStateSigningSecret(String stateSigningSecret) {
+        this.stateSigningSecret = stateSigningSecret;
+    }
+
+    public long getStateTtlSeconds() {
+        return stateTtlSeconds;
+    }
+
+    public void setStateTtlSeconds(long stateTtlSeconds) {
+        this.stateTtlSeconds = stateTtlSeconds;
     }
 
     public boolean isAllowedRedirectUri(String redirectUri) {

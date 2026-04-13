@@ -80,7 +80,13 @@ app:
     bucket-name: ${AWS_S3_BUCKET:minton-match-uploads}
     region: ${AWS_REGION:ap-northeast-2}
   oauth2:
+    mobile-callback-uri: ${MOBILE_OAUTH_CALLBACK_URI:com.mintonmatch.app://oauth/callback}
+    state-signing-secret: ${OAUTH_STATE_SIGNING_SECRET:change-this-oauth-state-secret-in-production}
+    state-ttl-seconds: ${OAUTH_STATE_TTL_SECONDS:300}
     allowed-redirect-uris:
       - com.mintonmatch.app://oauth/callback
       - http://localhost:3000/oauth/callback
       - http://127.0.0.1:3000/oauth/callback
+      - ${NAVER_BRIDGE_REDIRECT_URI:http://192.168.45.25:8080/oauth/naver/callback}
+      - ${GOOGLE_BRIDGE_REDIRECT_URI:http://localhost:8080/oauth/google/callback}
+

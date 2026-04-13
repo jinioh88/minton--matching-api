@@ -20,7 +20,7 @@ spring:
           kakao:
             redirect-uri: ${OAUTH_REDIRECT_URI:com.mintonmatch.app://oauth/callback}
           naver:
-            redirect-uri: ${OAUTH_REDIRECT_URI:com.mintonmatch.app://oauth/callback}
+            redirect-uri: ${NAVER_OAUTH_REDIRECT_URI:${OAUTH_REDIRECT_URI:com.mintonmatch.app://oauth/callback}}
           google:
             redirect-uri: ${OAUTH_REDIRECT_URI:com.mintonmatch.app://oauth/callback}
           apple:
@@ -83,3 +83,14 @@ minton:
       enabled: ${FCM_ENABLED:false}
       # 컨테이너에 마운트한 JSON 파일 절대 경로. 비우면 GOOGLE_APPLICATION_CREDENTIALS 환경변수 사용
       credentials-path: ${FCM_CREDENTIALS_PATH:}
+
+app:
+  oauth2:
+    mobile-callback-uri: ${MOBILE_OAUTH_CALLBACK_URI:com.mintonmatch.app://oauth/callback}
+    state-signing-secret: ${OAUTH_STATE_SIGNING_SECRET}
+    state-ttl-seconds: ${OAUTH_STATE_TTL_SECONDS:300}
+    allowed-redirect-uris:
+      - com.mintonmatch.app://oauth/callback
+      - ${WEB_OAUTH_REDIRECT_URI:https://app.example.com/oauth/callback}
+      - ${NAVER_BRIDGE_REDIRECT_URI:https://api.example.com/oauth/naver/callback}
+      - ${GOOGLE_BRIDGE_REDIRECT_URI:http://localhost:8080/oauth/google/callback}

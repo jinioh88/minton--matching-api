@@ -54,6 +54,8 @@ public class SecurityConfig {
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/ws-chat", "/ws-chat/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/oauth/naver/callback").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/oauth/google/callback").permitAll()
                         .requestMatchers("/api/auth/**", "/api/health", "/api/users/check-nickname").permitAll()
                         .requestMatchers("/api/users/me", "/api/users/me/**", "/api/files/upload").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/matches").authenticated()
