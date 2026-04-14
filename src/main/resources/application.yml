@@ -87,6 +87,4 @@ app:
       - com.mintonmatch.app://oauth/callback
       - http://localhost:3000/oauth/callback
       - http://127.0.0.1:3000/oauth/callback
-      - ${NAVER_BRIDGE_REDIRECT_URI:http://192.168.45.25:8080/oauth/naver/callback}
-      - ${GOOGLE_BRIDGE_REDIRECT_URI:http://localhost:8080/oauth/google/callback}
 

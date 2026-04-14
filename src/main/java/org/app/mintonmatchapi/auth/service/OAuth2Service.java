@@ -13,6 +13,7 @@ import org.app.mintonmatchapi.user.entity.Provider;
 import org.app.mintonmatchapi.user.entity.User;
 import org.app.mintonmatchapi.user.repository.UserRepository;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
@@ -36,6 +37,9 @@ public class OAuth2Service {
     private final UserRepository userRepository;
     private final JwtService jwtService;
     private final RestClient restClient = RestClient.create();
+    private static final String KAKAO_ME_API = "https://kapi.kakao.com/v2/user/me";
+    private static final String NAVER_ME_API = "https://openapi.naver.com/v1/nid/me";
+    private static final String GOOGLE_ME_API = "https://www.googleapis.com/oauth2/v3/userinfo";
 
     public OAuth2Service(OAuth2Properties oauth2Properties,
                         ClientRegistrationRepository clientRegistrationRepository,
@@ -48,6 +52,18 @@ public class OAuth2Service {
     }
 
     public AuthResponse login(OAuthLoginRequest request) {
+        Map<String, Object> userAttributes;
+        if (StringUtils.hasText(request.getSocialAccessToken())) {
+            userAttributes = fetchUserInfoWithSocialAccessToken(request.getProvider(), request.getSocialAccessToken());
+        } else {
+            userAttributes = fetchUserInfoWithAuthorizationCode(request);
+        }
+
+        User user = findOrCreateUser(request.getProvider(), userAttributes);
+        return buildAuthResponse(user);
+    }
+
+    private Map<String, Object> fetchUserInfoWithAuthorizationCode(OAuthLoginRequest request) {
         if (!oauth2Properties.isAllowedRedirectUri(request.getRedirectUri())) {
             throw new BusinessException(ErrorCode.OAUTH_INVALID, "허용되지 않은 redirect URI입니다.");
         }
@@ -58,12 +74,47 @@ public class OAuth2Service {
         }
 
         TokenExchangeResult tokenResult = exchangeCodeForToken(registration, request.getAuthorizationCode(), request.getRedirectUri());
-        Map<String, Object> userAttributes = fetchUserInfo(request.getProvider(), registration, tokenResult);
+        return fetchUserInfo(request.getProvider(), registration, tokenResult);
+    }
 
-        User user = findOrCreateUser(request.getProvider(), userAttributes);
+    private Map<String, Object> fetchUserInfoWithSocialAccessToken(Provider provider, String socialAccessToken) {
+        return switch (provider) {
+            case KAKAO -> requestUserInfoWithBearerToken(provider, KAKAO_ME_API, socialAccessToken);
+            case NAVER -> requestUserInfoWithBearerToken(provider, NAVER_ME_API, socialAccessToken);
+            case GOOGLE -> requestUserInfoWithBearerToken(provider, GOOGLE_ME_API, socialAccessToken);
+            case APPLE -> throw new BusinessException(ErrorCode.OAUTH_INVALID, "APPLE은 authorization code 로그인만 지원합니다.");
+        };
+    }
 
+    private Map<String, Object> requestUserInfoWithBearerToken(Provider provider, String userInfoUri, String socialAccessToken) {
+        Map<String, Object> userInfo;
+        try {
+            userInfo = restClient.get()
+                    .uri(userInfoUri)
+                    .headers(h -> h.setBearerAuth(socialAccessToken))
+                    .retrieve()
+                    .body(new ParameterizedTypeReference<Map<String, Object>>() {});
+        } catch (RestClientResponseException e) {
+            log.warn("소셜 AccessToken 검증 실패 provider={}, status={}, body={}",
+                    provider,
+                    e.getStatusCode().value(),
+                    e.getResponseBodyAsString());
+            if (e.getStatusCode().value() == 401) {
+                throw new BusinessException(
+                        ErrorCode.OAUTH_SOCIAL_TOKEN_EXPIRED,
+                        buildSocialTokenFailureMessage(provider, e)
+                );
+            }
+            throw new BusinessException(ErrorCode.OAUTH_INVALID, buildSocialTokenFailureMessage(provider, e));
+        }
+        if (userInfo == null) {
+            throw new BusinessException(ErrorCode.OAUTH_INVALID, "소셜 사용자 정보 조회에 실패했습니다.");
+        }
+        return userInfo;
+    }
+
+    private AuthResponse buildAuthResponse(User user) {
         String jwt = jwtService.generateToken(user);
-
         return AuthResponse.builder()
                 .accessToken(jwt)
                 .user(AuthResponse.UserResponse.from(user))
@@ -95,7 +146,7 @@ public class OAuth2Service {
                     .body(new ParameterizedTypeReference<Map<String, Object>>() {});
         } catch (RestClientResponseException e) {
             logOAuthTokenExchangeFailure(registration, redirectUri, e);
-            throw new BusinessException(ErrorCode.OAUTH_INVALID, buildOAuthTokenExchangeFailureMessage(registration, e));
+            throw resolveTokenExchangeException(registration, e);
         }
 
         if (response == null) {
@@ -206,6 +257,24 @@ public class OAuth2Service {
         Map<String, Object> errorBody = parseResponseBodyToMap(responseBody);
         Object errorDescription = errorBody.get("error_description");
         return errorDescription != null ? errorDescription.toString() : "unknown";
+    }
+
+    private BusinessException resolveTokenExchangeException(ClientRegistration registration, RestClientResponseException e) {
+        String oauthError = extractOAuthError(e.getResponseBodyAsString());
+        HttpStatusCode statusCode = e.getStatusCode();
+        if (statusCode.value() == 400 && ("invalid_grant".equalsIgnoreCase(oauthError) || "invalid_request".equalsIgnoreCase(oauthError))) {
+            return new BusinessException(
+                    ErrorCode.OAUTH_AUTHORIZATION_CODE_INVALID,
+                    buildOAuthTokenExchangeFailureMessage(registration, e)
+            );
+        }
+        return new BusinessException(ErrorCode.OAUTH_INVALID, buildOAuthTokenExchangeFailureMessage(registration, e));
+    }
+
+    private String buildSocialTokenFailureMessage(Provider provider, RestClientResponseException e) {
+        String oauthError = extractOAuthError(e.getResponseBodyAsString());
+        String errorDescription = extractOAuthErrorDescription(e.getResponseBodyAsString());
+        return String.format("%s 소셜 토큰 검증 실패: %s (%s)", provider.name(), oauthError, errorDescription);
     }
 
     private Map<String, Object> parseResponseBodyToMap(String responseBody) {

@@ -92,5 +92,3 @@ app:
     allowed-redirect-uris:
       - com.mintonmatch.app://oauth/callback
       - ${WEB_OAUTH_REDIRECT_URI:https://app.example.com/oauth/callback}
-      - ${NAVER_BRIDGE_REDIRECT_URI:https://api.example.com/oauth/naver/callback}
-      - ${GOOGLE_BRIDGE_REDIRECT_URI:http://localhost:8080/oauth/google/callback}

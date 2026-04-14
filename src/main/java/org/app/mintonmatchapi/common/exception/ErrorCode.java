@@ -21,6 +21,8 @@ public enum ErrorCode {
     CANNOT_CANCEL(HttpStatus.BAD_REQUEST, "취소할 수 없는 상태입니다."),
     OFFER_EXPIRED(HttpStatus.BAD_REQUEST, "예약 기회가 만료되었습니다."),
     OAUTH_INVALID(HttpStatus.BAD_REQUEST, "OAuth 인증에 실패했습니다."),
+    OAUTH_AUTHORIZATION_CODE_INVALID(HttpStatus.BAD_REQUEST, "OAuth 인가 코드가 유효하지 않습니다."),
+    OAUTH_SOCIAL_TOKEN_EXPIRED(HttpStatus.UNAUTHORIZED, "소셜 Access Token이 만료되었거나 유효하지 않습니다."),
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."),
     REVIEW_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "후기를 작성할 수 없습니다."),
     SELF_REVIEW_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "본인에게는 후기를 작성할 수 없습니다."),
