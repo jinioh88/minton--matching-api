@@ -92,3 +92,25 @@ app:
     allowed-redirect-uris:
       - com.mintonmatch.app://oauth/callback
       - ${WEB_OAUTH_REDIRECT_URI:https://app.example.com/oauth/callback}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        # logfile은 절대 포함하지 않고 health만 허용합니다.
+        include: health
+  endpoint:
+    health:
+      # 운영 환경에서는 상세 정보(DB 상태 등)를 숨기는 것이 보안상 좋습니다.
+      show-details: never
+
+logging:
+  file:
+    # 앞서 결정한 로그 저장 경로를 지정합니다.
+    name: /home/ec2-user/cmarket_api/app.log
+  logback:
+    rollingpolicy:
+      # 로그 파일이 너무 커져서 디스크를 꽉 채우지 않도록 관리합니다.
+      max-file-size: 10MB
+      total-size-cap: 100MB
+      max-history: 7
