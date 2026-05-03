@@ -105,6 +105,9 @@ management:
       show-details: never
 
 logging:
+  level:
+    # Spring이 주기적으로 찍는 STOMP/WebSocket 브로커 통계(INFO) — CloudWatch·알림 노이즈·비용 완화
+    org.springframework.web.socket.config.WebSocketMessageBrokerStats: WARN
   file:
     # 앞서 결정한 로그 저장 경로를 지정합니다.
     name: /home/ec2-user/cmarket_api/app.log
